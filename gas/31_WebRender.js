@@ -48,7 +48,7 @@ function renderPage_(view, ctx) {
   <table>
     <thead>
       <tr><th>日付</th><th>曜日</th><th>休憩</th><th>出勤</th><th>退勤</th>
-          <th>残業</th><th>実働</th><th class="scaleHead">${renderTimeScale_()}</th></tr>
+          <th>法定内残業</th><th>時間外</th><th>実働</th><th class="scaleHead">${renderTimeScale_()}</th></tr>
     </thead>
     <tbody id="attendanceRows">${view.rowsHtml}</tbody>
   </table>
@@ -120,13 +120,14 @@ function renderRows_(summary) {
       '<td>' + escapeHtml_(fmtMin_(r.breakM)) + '</td>' +
       '<td>' + escapeHtml_(r.inStr) + '</td>' +
       '<td>' + escapeHtml_(r.outStr) + '</td>' +
-      '<td>' + escapeHtml_(r.otM > 0 ? fmtMin_(r.otM) : '') + '</td>' +
+      '<td>' + escapeHtml_(r.legalOtM > 0 ? fmtMin_(r.legalOtM) : '') + '</td>' +
+      '<td>' + escapeHtml_(r.statutoryOtM > 0 ? fmtMin_(r.statutoryOtM) : '') + '</td>' +
       '<td>' + escapeHtml_(fmtMin_(r.workM)) + '</td>' +
       '<td class="barCell"><div class="barTrack">' + bar + '</div></td>' +
     '</tr>';
   });
 
-  return rows || '<tr><td colspan="8">この月の記録はありません</td></tr>';
+  return rows || '<tr><td colspan="9">この月の記録はありません</td></tr>';
 }
 
 function renderTimeScale_() {

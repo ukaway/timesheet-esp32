@@ -5,6 +5,15 @@ function fmtMin_(min) {
   return `${h}:${('0' + m).slice(-2)}`;
 }
 
+function calcOvertimeBreakdown_(workMin) {
+  const scheduledMin = 7 * 60 + 30;
+  const statutoryMin = 8 * 60;
+  return {
+    legalOtM: Math.max(0, Math.min(workMin, statutoryMin) - scheduledMin),
+    statutoryOtM: Math.max(0, workMin - statutoryMin)
+  };
+}
+
 // ===========================================================================
 // ヘルパー
 // ===========================================================================

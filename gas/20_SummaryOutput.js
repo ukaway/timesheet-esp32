@@ -3,7 +3,7 @@
  * 勤怠サマリ生成（別スプレッドシート出力可）
  * 生データ各職員タブ [日時, staff_id, in/out] → 日次サマリ表を書き出す。
  *
- * 列: A日付 B曜日 C勤務 D出勤 E退勤 F休憩 G残業 H実働 | I〜(I+47) 8:00-20:00の15分帯
+ * 列: A日付 B曜日 C勤務 D出勤 E退勤 F休憩 G法定内残業 H時間外 I実働 | J〜 8:00-20:00の時間帯
  */
 
 // ===== サマリ設定 =====
@@ -12,7 +12,6 @@ const SUMMARY = {
   GRAPH_START_HOUR: 8,       // 帯の開始時刻
   GRAPH_END_HOUR: 20,        // 帯の終了時刻
   SLOT_MIN: 10,              // 帯の粒度（分）
-  OVERTIME_AFTER: 18,        // 所定終業（時）। これ以降の実働を残業
   DAYS_BACK: 31,             // 何日分さかのぼって集計するか
 };
 const WEEK_JP = ['日', '月', '火', '水', '木', '金', '土'];
@@ -54,11 +53,11 @@ function buildSummaryForStaff_(srcSheet, outSs, outSheetName, tz) {
 
   const dates = Object.keys(events).sort();
   const slotCount = (SUMMARY.GRAPH_END_HOUR - SUMMARY.GRAPH_START_HOUR)
-                    * 60 / SUMMARY.SLOT_MIN;                 // 144
-  const BASE_COL = 9;                                        // 帯開始列(I)
+                    * 60 / SUMMARY.SLOT_MIN;                 // 72
+  const BASE_COL = 10;                                       // 帯開始列(J)
 
   // ヘッダ（正時のみラベル）
-  const header = ['日付', '曜日', '勤務', '出勤', '退勤', '休憩', '残業', '実働'];
+  const header = ['日付', '曜日', '勤務', '出勤', '退勤', '休憩', '法定内残業', '時間外', '実働'];
   for (let s = 0; s < slotCount; s++) {
     const mins = SUMMARY.GRAPH_START_HOUR * 60 + s * SUMMARY.SLOT_MIN;
     header.push((mins % 60 === 0) ? `${mins / 60}` : '');
@@ -76,7 +75,8 @@ function buildSummaryForStaff_(srcSheet, outSs, outSheetName, tz) {
     40, // 出勤
     40, // 退勤
     40, // 休憩
-    40, // 残業
+    70, // 法定内残業
+    50, // 時間外
     40  // 実働
   ].forEach((width, i) => {
     out.setColumnWidth(i + 1, width);
@@ -123,14 +123,7 @@ function buildSummaryForStaff_(srcSheet, outSs, outSheetName, tz) {
     let workMin = 0;
     intervals.forEach(([a, b]) => { workMin += ((b || new Date()) - a) / 60000; });
 
-    const otTh = new Date(firstIn);
-    otTh.setHours(SUMMARY.OVERTIME_AFTER, 0, 0, 0);
-    let otMin = 0;
-    intervals.forEach(([a, b]) => {
-      const end = b || new Date();
-      const s = Math.max(a.getTime(), otTh.getTime());
-      if (end.getTime() > s) otMin += (end.getTime() - s) / 60000;
-    });
+    const overtime = calcOvertimeBreakdown_(workMin);
 
     const dObj = new Date(dateStr + 'T00:00:00');
     dataRows.push([
@@ -138,7 +131,8 @@ function buildSummaryForStaff_(srcSheet, outSs, outSheetName, tz) {
       Utilities.formatDate(firstIn, tz, 'HH:mm'),
       stillIn ? '勤務中' : Utilities.formatDate(lastOut, tz, 'HH:mm'),
       fmtMin_(breakMin),
-      otMin > 0 ? fmtMin_(otMin) : '',
+      overtime.legalOtM > 0 ? fmtMin_(overtime.legalOtM) : '',
+      overtime.statutoryOtM > 0 ? fmtMin_(overtime.statutoryOtM) : '',
       fmtMin_(workMin),
     ]);
     intervalsByRow.push({ dateStr: dateStr, intervals: intervals });
@@ -146,11 +140,11 @@ function buildSummaryForStaff_(srcSheet, outSs, outSheetName, tz) {
 
   if (dataRows.length === 0) return;
 
-  // A〜H列の値を一括書き込み
-  out.getRange(2, 1, dataRows.length, 8).setValues(dataRows);
+  // A〜I列の値を一括書き込み
+  out.getRange(2, 1, dataRows.length, 9).setValues(dataRows);
 
-  // A〜H列の値を左揃え
-  out.getRange(1, 1, dataRows.length + 1, 8).setHorizontalAlignment('left');
+  // A〜I列の値を左揃え
+  out.getRange(1, 1, dataRows.length + 1, 9).setHorizontalAlignment('left');
 
   // 帯列を細く
   out.setColumnWidths(BASE_COL, slotCount, 8);

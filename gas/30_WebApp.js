@@ -120,7 +120,7 @@ function buildAttendanceView_(staffId, month, order, tz) {
 
 /**
  * 指定月の日次サマリ配列を返す。
- * 返却: [{date, week, inStr, outStr, breakM, otM, workM, intervals, stillIn}]
+ * 返却: [{date, week, inStr, outStr, breakM, legalOtM, statutoryOtM, workM, intervals, stillIn}]
  */
 function summarizeDaily_(sh, tz, month) {
   const raw = sh.getDataRange().getValues();
@@ -170,14 +170,7 @@ function summarizeDaily_(sh, tz, month) {
       workM += ((end || new Date()) - start) / 60000;
     });
 
-    const overtimeStart = new Date(firstIn);
-    overtimeStart.setHours(17, 0, 0, 0);
-    let otM = 0;
-    intervals.forEach(([start, end]) => {
-      const finish = end || new Date();
-      const s = Math.max(start.getTime(), overtimeStart.getTime());
-      if (finish.getTime() > s) otM += (finish.getTime() - s) / 60000;
-    });
+    const overtime = calcOvertimeBreakdown_(workM);
 
     result.push({
       date: dateStr,
@@ -185,7 +178,8 @@ function summarizeDaily_(sh, tz, month) {
       inStr: Utilities.formatDate(firstIn, tz, 'HH:mm'),
       outStr: stillIn ? '勤務中' : Utilities.formatDate(lastOut, tz, 'HH:mm'),
       breakM: breakM,
-      otM: otM,
+      legalOtM: overtime.legalOtM,
+      statutoryOtM: overtime.statutoryOtM,
       workM: workM,
       intervals: intervals,
       stillIn: stillIn
