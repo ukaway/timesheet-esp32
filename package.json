@@ -1,0 +1,12 @@
+{
+  "scripts": {
+    "gas:login": "clasp login",
+    "gas:pull": "clasp pull",
+    "gas:push": "clasp push",
+    "gas:status": "clasp status",
+    "gas:open": "clasp open"
+  },
+  "devDependencies": {
+    "@google/clasp": "^3.3.0"
+  }
+}

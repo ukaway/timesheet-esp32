@@ -1,0 +1,12 @@
+**/**
+!appsscript.json
+!00_Config.js
+!10_Post.js
+!20_SummaryOutput.js
+!30_WebApp.js
+!31_WebRender.js
+!40_FormEdits.js
+!50_Notifications.js
+!60_Setup.js
+!90_Utils.js
+!*.html

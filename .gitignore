@@ -1,0 +1,21 @@
+node_modules/
+.DS_Store
+.env
+.env.*
+
+# clasp local OAuth credentials, if you ever choose project-local auth.
+.clasprc.json
+
+# Arduino build artifacts
+build/
+*.elf
+*.bin
+*.hex
+*.map
+
+# Local firmware secrets
+firmware/**/secrets.h
+
+# Legacy GAS files kept locally after splitting by responsibility
+gas/コード.js
+gas/Webアプリ.js
