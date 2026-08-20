@@ -5,24 +5,25 @@ function dailyCheckMissingClockout() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const tz = ss.getSpreadsheetTimeZone();
   const today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+  const logSh = ss.getSheetByName(CONFIG.LOG_SHEET);
+  if (!logSh) return;
+  const data = logSh.getDataRange().getValues();
 
   Object.keys(STAFF).forEach(staffId => {
     const { name, email } = STAFF[staffId];
-    const sh = ss.getSheetByName(name);
-    if (!sh) return;
-
-    const data = sh.getDataRange().getValues();
     const todayRows = [];
     for (let i = 1; i < data.length; i++) {
       if (!data[i][0]) continue;
+      if (String(data[i][1] || '').trim() !== staffId) continue;
       const day = Utilities.formatDate(new Date(data[i][0]), tz, 'yyyy-MM-dd');
       if (day === today) todayRows.push(data[i]);
     }
     if (todayRows.length === 0) return;                       // 当日出勤なし
-    if (todayRows[todayRows.length - 1][2] !== 'in') return;  // 退勤済み
+    todayRows.sort((a, b) => new Date(a[0]) - new Date(b[0]));
+    if (todayRows[todayRows.length - 1][3] !== 'in') return;  // 退勤済み
     if (!email) return;
 
-    const firstIn = todayRows.find(r => r[2] === 'in');
+    const firstIn = todayRows.find(r => r[3] === 'in');
     const inTime = firstIn
       ? Utilities.formatDate(new Date(firstIn[0]), tz, 'HH:mm') : '不明';
 

@@ -54,11 +54,10 @@ function applyEdits() {
       if (isNaN(d.getTime())) { markState_(form, i, 'エラー:日時'); continue; }
       const target = Utilities.formatDate(d, tz, 'yyyy-MM-dd HH:mm:ss');
 
-      const sh = ss.getSheetByName(STAFF[staffId].name);
-      if (!sh) { markState_(form, i, 'エラー:シート無'); continue; }
+      const sh = getOrCreateLogSheet_(ss);
 
       if (op === 'add') {
-        sh.appendRow([target, staffId, kind]);
+        sh.appendRow([target, staffId, STAFF[staffId].name, kind]);
         markState_(form, i, '済:' + email);
       } else { // delete
         const data = sh.getDataRange().getValues();
@@ -66,7 +65,9 @@ function applyEdits() {
         for (let r = data.length - 1; r >= 1; r--) {
           if (!data[r][0]) continue;
           const rowTs = Utilities.formatDate(new Date(data[r][0]), tz, 'yyyy-MM-dd HH:mm:ss');
-          if (rowTs === target && data[r][2] === kind) {
+          if (rowTs === target
+              && String(data[r][1] || '').trim() === staffId
+              && String(data[r][3] || '').trim() === kind) {
             sh.deleteRow(r + 1);
             deleted = true;
             break;
@@ -74,6 +75,7 @@ function applyEdits() {
         }
         markState_(form, i, deleted ? ('済:' + email) : 'エラー:該当無');
       }
+      rebuildStatusSheetFromLog_(ss, tz);
     }
   } catch (err) {
     Logger.log('applyEdits失敗: ' + err);

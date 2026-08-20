@@ -171,7 +171,9 @@ void blink(bool ok) {
   }
 }
 
-bool sendPunch(const char* staffId) {
+bool sendPunch(const char* staffId, char* kindOut, size_t kindOutSize) {
+  if (kindOutSize > 0) kindOut[0] = '\0';
+
   if (WiFi.status() != WL_CONNECTED) {
     connectWifi();
     if (WiFi.status() != WL_CONNECTED) {
@@ -208,6 +210,15 @@ bool sendPunch(const char* staffId) {
   if (code == HTTP_CODE_OK) {
     String payload = http.getString();
     ok = payload.indexOf("\"ok\":true") >= 0;
+    if (ok && kindOutSize > 0) {
+      if (payload.indexOf("\"kind\":\"in\"") >= 0) {
+        snprintf(kindOut, kindOutSize, "%s", "IN");
+      } else if (payload.indexOf("\"kind\":\"out\"") >= 0) {
+        snprintf(kindOut, kindOutSize, "%s", "OUT");
+      } else if (payload.indexOf("\"kind\":\"duplicate\"") >= 0) {
+        snprintf(kindOut, kindOutSize, "%s", "DUP");
+      }
+    }
     Serial.print("応答 -> "); Serial.println(payload);
   }
   http.end();
@@ -237,9 +248,10 @@ void loop() {
       if (now - lastPress[i] > LOCKOUT_MS) {
         lastPress[i] = now;
         showMessage("PUSH", STAFF_NAMES[i], "");
-        bool ok = sendPunch(STAFF_IDS[i]);
+        char kind[4];
+        bool ok = sendPunch(STAFF_IDS[i], kind, sizeof(kind));
         blink(ok);
-        showMessage(ok ? "OK" : "FAILED", STAFF_NAMES[i], "");
+        showMessage(ok ? "OK" : "FAILED", STAFF_NAMES[i], kind);
       }
       delay(DEBOUNCE_MS);
     }

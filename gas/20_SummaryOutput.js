@@ -1,17 +1,14 @@
 // ===========================================================================
 /**
  * 勤怠サマリ生成（別スプレッドシート出力可）
- * 生データ各職員タブ [日時, staff_id, in/out] → 日次サマリ表を書き出す。
+ * 打刻ログ [日時, staff_id, 職員, in/out] → 日次サマリ表を書き出す。
  *
- * 列: A日付 B曜日 C勤務 D出勤 E退勤 F休憩 G法定内残業 H時間外 I実働 | J〜 8:00-20:00の時間帯
+ * 列: A日付 B曜日 C勤務 D出勤 E退勤 F休憩 G法定内残業 H時間外 I実働
  */
 
 // ===== サマリ設定 =====
 const SUMMARY = {
   OUTPUT_SS_ID: getScriptProp_('KINTAI_SUMMARY_OUTPUT_SS_ID', ''), // 別ブックに出すならそのID。空なら同一ブック
-  GRAPH_START_HOUR: 8,       // 帯の開始時刻
-  GRAPH_END_HOUR: 20,        // 帯の終了時刻
-  SLOT_MIN: 10,              // 帯の粒度（分）
   DAYS_BACK: 31,             // 何日分さかのぼって集計するか
 };
 const WEEK_JP = ['日', '月', '火', '水', '木', '金', '土'];
@@ -25,19 +22,19 @@ function buildAllSummaries() {
   const outSs = SUMMARY.OUTPUT_SS_ID
     ? SpreadsheetApp.openById(SUMMARY.OUTPUT_SS_ID)
     : srcSs;
+  const logSh = srcSs.getSheetByName(CONFIG.LOG_SHEET);
+  if (!logSh) return;
 
   Object.keys(STAFF).forEach(staffId => {
     const name = STAFF[staffId].name;
-    const src = srcSs.getSheetByName(name);
-    if (!src) return;
-    buildSummaryForStaff_(src, outSs, name + '_勤怠', tz);
+    buildSummaryForStaff_(logSh, outSs, name + '_勤怠', tz, staffId);
   });
 }
 
 /**
  * 1職員分のサマリを outSheetName に書き出す。
  */
-function buildSummaryForStaff_(srcSheet, outSs, outSheetName, tz) {
+function buildSummaryForStaff_(srcSheet, outSs, outSheetName, tz, staffId) {
   const raw = srcSheet.getDataRange().getValues();
 
   const events = {};
@@ -45,23 +42,15 @@ function buildSummaryForStaff_(srcSheet, outSs, outSheetName, tz) {
   cutoff.setDate(cutoff.getDate() - SUMMARY.DAYS_BACK);
   for (let i = 1; i < raw.length; i++) {
     if (!raw[i][0]) continue;
+    if (String(raw[i][1] || '').trim() !== staffId) continue;
     const t = new Date(raw[i][0]);
     if (isNaN(t.getTime()) || t < cutoff) continue;
     const dateStr = Utilities.formatDate(t, tz, 'yyyy-MM-dd');
-    (events[dateStr] = events[dateStr] || []).push({ t: t, kind: raw[i][2] });
+    (events[dateStr] = events[dateStr] || []).push({ t: t, kind: raw[i][3] });
   }
 
   const dates = Object.keys(events).sort();
-  const slotCount = (SUMMARY.GRAPH_END_HOUR - SUMMARY.GRAPH_START_HOUR)
-                    * 60 / SUMMARY.SLOT_MIN;                 // 72
-  const BASE_COL = 10;                                       // 帯開始列(J)
-
-  // ヘッダ（正時のみラベル）
   const header = ['日付', '曜日', '勤務', '出勤', '退勤', '休憩', '法定内残業', '時間外', '実働'];
-  for (let s = 0; s < slotCount; s++) {
-    const mins = SUMMARY.GRAPH_START_HOUR * 60 + s * SUMMARY.SLOT_MIN;
-    header.push((mins % 60 === 0) ? `${mins / 60}` : '');
-  }
 
   // 出力タブは毎回作り直す（結合残り・古いデータを完全排除）
   const existing = outSs.getSheetByName(outSheetName);
@@ -86,18 +75,7 @@ function buildSummaryForStaff_(srcSheet, outSs, outSheetName, tz) {
   out.setFrozenRows(1);
   out.setFrozenColumns(3);
 
-  const slotsPerHour = 60 / SUMMARY.SLOT_MIN;          // 5分刻み → 12
-  const hours = SUMMARY.GRAPH_END_HOUR - SUMMARY.GRAPH_START_HOUR; // 12
-  for (let h = 0; h < hours; h++) {
-    const c1 = BASE_COL + h * slotsPerHour;            // その時間帯の先頭列
-    const hourRange = out.getRange(1, c1, 1, slotsPerHour);
-    hourRange.merge()
-             .setHorizontalAlignment('left')
-            //  .setBorder(true, true, true, true, false, false); // 時間帯の枠線
-  }
-
   const dataRows = [];
-  const intervalsByRow = [];        // 各行の在室区間を後で結合描画に使う
 
   dates.forEach(dateStr => {
     const evs = events[dateStr].sort((a, b) => a.t - b.t);
@@ -135,7 +113,6 @@ function buildSummaryForStaff_(srcSheet, outSs, outSheetName, tz) {
       overtime.statutoryOtM > 0 ? fmtMin_(overtime.statutoryOtM) : '',
       fmtMin_(workMin),
     ]);
-    intervalsByRow.push({ dateStr: dateStr, intervals: intervals });
   });
 
   if (dataRows.length === 0) return;
@@ -145,37 +122,6 @@ function buildSummaryForStaff_(srcSheet, outSs, outSheetName, tz) {
 
   // A〜I列の値を左揃え
   out.getRange(1, 1, dataRows.length + 1, 9).setHorizontalAlignment('left');
-
-  // 帯列を細く
-  out.setColumnWidths(BASE_COL, slotCount, 8);
-
-  // 各行に結合バーを描画
-  intervalsByRow.forEach((info, idx) => {
-    const rowIndex = 2 + idx;
-    drawGanttBar_(out, rowIndex, BASE_COL, info.intervals, info.dateStr, slotCount);
-  });
-}
-
-/**
- * 在室区間ごとにセルを結合して連続バーを描く（5分粒度）。
- */
-function drawGanttBar_(out, rowIndex, baseCol, intervals, dateStr, slotCount) {
-  const startMin = SUMMARY.GRAPH_START_HOUR * 60;
-  const slotMin = SUMMARY.SLOT_MIN;
-  const dayStart = new Date(dateStr + 'T00:00:00');
-
-  intervals.forEach(([a, b]) => {
-    const end = b || new Date();
-    const aMin = (a - dayStart) / 60000;
-    const eMin = (end - dayStart) / 60000;
-    const fromSlot = Math.max(0, Math.floor((aMin - startMin) / slotMin));
-    const toSlot   = Math.min(slotCount, Math.ceil((eMin - startMin) / slotMin));
-    if (toSlot <= fromSlot) return;
-
-    const range = out.getRange(rowIndex, baseCol + fromSlot, 1, toSlot - fromSlot);
-    range.setBackground('#4a90d9');
-    if (toSlot - fromSlot > 1) range.merge();
-  });
 }
 
 // 日次トリガー設置（手動で一度実行）

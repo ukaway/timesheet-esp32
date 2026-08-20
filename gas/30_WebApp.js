@@ -41,6 +41,7 @@ function getAttendanceData(month, order, staffId) {
     order: view.order,
     staffId: view.staffId,
     rowsHtml: view.rowsHtml,
+    statusHtml: renderStatusList_(view.currentStatuses),
     monthOptionsHtml: renderMonthOptions_(view.months, view.month),
     orderLabel: view.order === 'asc' ? '昇順↑' : '降順↓'
   };
@@ -97,15 +98,15 @@ function getViewerContext_(requestedStaffId) {
 function buildAttendanceView_(staffId, month, order, tz) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const staff = STAFF[staffId];
-  const sh = ss.getSheetByName(staff.name);
-  const summary = sh ? summarizeDaily_(sh, tz, month) : [];
+  const logSh = ss.getSheetByName(CONFIG.LOG_SHEET);
+  const summary = logSh ? summarizeDaily_(logSh, tz, month, staffId) : [];
 
   summary.sort((a, b) => order === 'asc'
     ? a.date.localeCompare(b.date)
     : b.date.localeCompare(a.date));
 
   const nowMonth = Utilities.formatDate(new Date(), tz, 'yyyy-MM');
-  const months = sh ? availableMonths_(sh, tz) : [nowMonth];
+  const months = logSh ? availableMonths_(logSh, tz, staffId) : [nowMonth];
   if (months.indexOf(month) === -1) months.unshift(month);
 
   return {
@@ -114,7 +115,8 @@ function buildAttendanceView_(staffId, month, order, tz) {
     month: month,
     order: order,
     months: months,
-    rowsHtml: renderRows_(summary)
+    rowsHtml: renderRows_(summary),
+    currentStatuses: getCurrentStatuses_(ss, tz)
   };
 }
 
@@ -122,17 +124,18 @@ function buildAttendanceView_(staffId, month, order, tz) {
  * 指定月の日次サマリ配列を返す。
  * 返却: [{date, week, inStr, outStr, breakM, legalOtM, statutoryOtM, workM, intervals, stillIn}]
  */
-function summarizeDaily_(sh, tz, month) {
+function summarizeDaily_(sh, tz, month, staffId) {
   const raw = sh.getDataRange().getValues();
   const events = {};
   for (let i = 1; i < raw.length; i++) {
     if (!raw[i][0]) continue;
+    if (String(raw[i][1] || '').trim() !== staffId) continue;
     const t = new Date(raw[i][0]);
     if (isNaN(t.getTime())) continue;
     const m = Utilities.formatDate(t, tz, 'yyyy-MM');
     if (m !== month) continue;
     const d = Utilities.formatDate(t, tz, 'yyyy-MM-dd');
-    (events[d] = events[d] || []).push({ t: t, kind: raw[i][2] });
+    (events[d] = events[d] || []).push({ t: t, kind: raw[i][3] });
   }
 
   const WEEK = ['日', '月', '火', '水', '木', '金', '土'];
@@ -189,13 +192,38 @@ function summarizeDaily_(sh, tz, month) {
 }
 
 /** データのある月一覧（降順） */
-function availableMonths_(sh, tz) {
+function availableMonths_(sh, tz, staffId) {
   const raw = sh.getDataRange().getValues();
   const set = {};
   for (let i = 1; i < raw.length; i++) {
     if (!raw[i][0]) continue;
+    if (String(raw[i][1] || '').trim() !== staffId) continue;
     const t = new Date(raw[i][0]);
     if (!isNaN(t.getTime())) set[Utilities.formatDate(t, tz, 'yyyy-MM')] = 1;
   }
   return Object.keys(set).sort().reverse();
+}
+
+function getCurrentStatuses_(ss, tz) {
+  const statusSh = getOrCreateStatusSheet_(ss);
+  const rows = statusSh.getDataRange().getValues();
+  const byStaffId = {};
+  for (let i = 1; i < rows.length; i++) {
+    const staffId = String(rows[i][0] || '').trim();
+    if (!staffId || !STAFF[staffId]) continue;
+    byStaffId[staffId] = {
+      staffId: staffId,
+      name: rows[i][1] || STAFF[staffId].name,
+      status: String(rows[i][2] || 'out'),
+      lastTime: rows[i][3] ? Utilities.formatDate(new Date(rows[i][3]), tz, 'MM/dd HH:mm') : ''
+    };
+  }
+  return Object.keys(STAFF).map(staffId => {
+    return byStaffId[staffId] || {
+      staffId: staffId,
+      name: STAFF[staffId].name,
+      status: 'out',
+      lastTime: ''
+    };
+  });
 }

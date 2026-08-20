@@ -29,34 +29,29 @@ function doPost(e) {
 
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const tz = ss.getSpreadsheetTimeZone();
-    const sh = getOrCreateStaffSheet_(ss, STAFF[staffId].name);
+    const logSh = getOrCreateLogSheet_(ss);
+    const statusSh = getOrCreateStatusSheet_(ss);
 
     const now = new Date();
     const today = Utilities.formatDate(now, tz, 'yyyy-MM-dd');
-    const data = sh.getDataRange().getValues(); // [日時, staff_id, 区分]
+    const nowStr = Utilities.formatDate(now, tz, 'yyyy-MM-dd HH:mm:ss');
+    const state = getStatusRow_(statusSh, staffId);
+    const lastTime = state.values[3] ? new Date(state.values[3]) : null;
 
-    // 連打ロックアウト（このシートの最終行）
-    if (data.length > 1) {
-      const last = data[data.length - 1];
-      if (last[0] && (now - new Date(last[0])) < CONFIG.LOCKOUT_MS) {
-        return json_({ ok: true, kind: 'duplicate' });
-      }
+    // 連打ロックアウト（この職員の最新状態だけを見る）
+    if (lastTime && !isNaN(lastTime.getTime()) && (now - lastTime) < CONFIG.LOCKOUT_MS) {
+      return json_({ ok: true, kind: 'duplicate', status: state.values[2] || 'out' });
     }
 
-    // 当日の最終区分を見てトグル（日跨ぎで自動的に in から再開）
-    let lastKind = null;
-    for (let i = data.length - 1; i >= 1; i--) {
-      if (!data[i][0]) continue;
-      const day = Utilities.formatDate(new Date(data[i][0]), tz, 'yyyy-MM-dd');
-      if (day !== today) break;
-      lastKind = data[i][2];
-      break;
-    }
-    const kind = (lastKind === 'in') ? 'out' : 'in';
+    // 日が変わっていたら必ず in。当日中は現在状態を反転する。
+    const lastDate = String(state.values[4] || '');
+    const lastStatus = String(state.values[2] || 'out');
+    const kind = (lastDate === today && lastStatus === 'in') ? 'out' : 'in';
 
-    sh.appendRow([Utilities.formatDate(now, tz, 'yyyy-MM-dd HH:mm:ss'),
-                  staffId, kind]);
-    return json_({ ok: true, kind: kind });
+    logSh.appendRow([nowStr, staffId, STAFF[staffId].name, kind]);
+    statusSh.getRange(state.row, 1, 1, 5)
+      .setValues([[staffId, STAFF[staffId].name, kind, nowStr, today]]);
+    return json_({ ok: true, kind: kind, status: kind });
 
   } catch (err) {
     return json_({ ok: false, error: String(err) });

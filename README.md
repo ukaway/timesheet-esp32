@@ -10,7 +10,7 @@
 [ESP32 8ボタンパネル]
   └─ HTTPS POST
       └─ [GAS Webアプリ doPost]
-          └─ [Googleスプレッドシート 職員別シート]
+          └─ [Googleスプレッドシート 打刻ログ + 現在状態]
 
 [ブラウザ]
   └─ [GAS Webアプリ doGet]
@@ -66,9 +66,11 @@ npm run gas:open
 3. `clasp login` 済みの環境で、このリポジトリからGASへpushする
 4. GASのスクリプトプロパティを設定する
 5. `setupTriggers()` を手動実行して権限承認する
-6. `protectAllStaffSheets()` を必要に応じて手動実行する
-7. Webアプリとしてデプロイする
-8. 発行された `/exec` URLをESP32側の `GAS_URL` に設定する
+6. `setupDataSheets()` を手動実行して `打刻ログ` / `現在状態` を作成する
+7. 既存の職員別シートから移行する場合は `migrateStaffSheetsToLog()` を1回だけ手動実行する
+8. `protectAllStaffSheets()` を必要に応じて手動実行する
+9. Webアプリとしてデプロイする
+10. 発行された `/exec` URLをESP32側の `GAS_URL` に設定する
 
 スクリプトプロパティの例は以下を参照してください。
 
@@ -117,10 +119,12 @@ const char* TOKEN     = "GASのKINTAI_TOKENと同じ値";
 
 1ボタンで出勤・退勤を兼ねる自動トグル方式です。
 
-- 当日の最後の打刻がなければ `in`
-- 当日の最後の打刻が `in` なら次は `out`
-- 当日の最後の打刻が `out` なら次は `in`
+- `現在状態` の `lastDate` が今日でなければ `in`
+- `lastDate` が今日で、現在状態が `in` なら次は `out`
+- `lastDate` が今日で、現在状態が `out` なら次は `in`
 - 連打対策としてGAS側にロックアウト時間を設ける
+
+打刻履歴は `打刻ログ` へ1行ずつ残し、IN/OUT判定とWeb表示の現在状態は `現在状態` の対象スタッフ行だけを見ます。
 
 ## 閲覧画面
 
@@ -129,7 +133,7 @@ WebアプリURLをブラウザで開くと `doGet` が動き、ログイン中Go
 - 月切替
 - 昇順/降順切替
 - 管理者の職員切替
-- 8-19時の時間グラフ表示
+- スタッフIN/OUT一覧表示
 
 画面操作は `google.script.run` でGAS関数を呼び、ページ全体をリロードせずに表を更新します。
 

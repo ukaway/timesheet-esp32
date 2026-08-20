@@ -2,7 +2,7 @@
  * 鵜川医院 勤怠システム — Google Apps Script（サーバー不要）
  *
  * 構成:
- *   ESP32(8ボタン) --HTTPS POST--> doPost --> 職員別シートに打刻追記
+ *   ESP32(8ボタン) --HTTPS POST--> doPost --> 打刻ログに追記 + 現在状態を更新
  *   修正はGoogleフォーム(メール収集ON) --> onFormSubmit --> applyEdits --> 生データ反映
  *   退勤漏れ日次チェック --> 本人Gmailへフォーム申請を案内
  *
@@ -53,6 +53,8 @@ function getJsonScriptProp_(key, fallback) {
 const CONFIG = {
   TOKEN: getScriptProp_('KINTAI_TOKEN', ''), // ESP32と一致させる打刻用トークン
   LOCKOUT_MS: 10000,                  // 連打ロックアウト（ミリ秒）
+  LOG_SHEET: '打刻ログ',               // 全職員の打刻履歴
+  STATUS_SHEET: '現在状態',            // IN/OUT判定とWeb表示用の最新状態
   FORM_TAB: 'フォームの回答 1',        // フォーム回答タブ名（実際の名前に合わせる）
   STATE_COL: 7,                       // 回答タブ 状態列（G列 = 7）
   DAILY_HOUR: 23,                     // 退勤漏れチェック実行時刻（時）
