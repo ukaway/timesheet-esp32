@@ -10,7 +10,7 @@
  *   1. スプレッドシートのTZをJSTに設定（ファイル > 設定）
  *   2. フォームを作成し「メールアドレスを収集」ON、回答先を本ブックに
  *      質問順: 職員(プルダウン) / 対象日時(記述) / 区分(出勤,退勤) / 操作(追加,削除)
- *   3. スクリプト プロパティに TOKEN / メール / URL / 出力先IDを設定
+ *   3. スクリプト プロパティに TOKEN / 職員名 / メール / URL / 出力先IDを設定
  *   4. setupTriggers() を手動実行（権限承認）
  *   5. protectAllStaffSheets() を手動実行
  *   6. デプロイ > 新しいデプロイ > ウェブアプリ
@@ -63,17 +63,22 @@ const CONFIG = {
   ADMIN_EMAILS: getListScriptProp_('KINTAI_ADMIN_EMAILS'), // 管理者（申請許可＆本人性チェック除外）
 };
 
-// 職員名マスタ: staff_id -> name(=タブ名)
-const STAFF_NAMES = {
-  staff1: '院長',
-  staff2: '看護A',
-  staff3: '看護B',
-  staff4: '受付A',
-  staff5: '受付B',
-  staff6: '検査技師',
-  staff7: '事務A',
-  staff8: '事務B',
+// 職員名はスクリプト プロパティ KINTAI_STAFF_NAMES_JSON に置く。
+const DEFAULT_STAFF_NAMES = {
+  staff1: '職員1',
+  staff2: '職員2',
+  staff3: '職員3',
+  staff4: '職員4',
+  staff5: '職員5',
+  staff6: '職員6',
+  staff7: '職員7',
+  staff8: '職員8',
 };
+const STAFF_NAME_OVERRIDES = getJsonScriptProp_('KINTAI_STAFF_NAMES_JSON', {});
+const STAFF_NAMES = Object.keys(DEFAULT_STAFF_NAMES).reduce((m, id) => {
+  m[id] = String(STAFF_NAME_OVERRIDES[id] || DEFAULT_STAFF_NAMES[id]).trim();
+  return m;
+}, {});
 
 // 職員メールはスクリプト プロパティ KINTAI_STAFF_EMAILS_JSON に置く。
 const STAFF_EMAILS = getJsonScriptProp_('KINTAI_STAFF_EMAILS_JSON', {});

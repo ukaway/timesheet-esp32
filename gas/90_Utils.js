@@ -62,7 +62,10 @@ function syncStatusStaffRows_(sh) {
 
   const rowsToAppend = [];
   Object.keys(STAFF).forEach(staffId => {
-    if (!rowByStaffId[staffId]) {
+    const row = rowByStaffId[staffId];
+    if (row) {
+      sh.getRange(row, 2).setValue(STAFF[staffId].name);
+    } else {
       rowsToAppend.push([staffId, STAFF[staffId].name, 'out', '', '']);
     }
   });
