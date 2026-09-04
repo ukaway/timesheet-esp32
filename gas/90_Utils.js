@@ -14,6 +14,19 @@ function calcOvertimeBreakdown_(workMin) {
   };
 }
 
+function toDateKey_(value, tz) {
+  if (!value) return '';
+  if (Object.prototype.toString.call(value) === '[object Date]' && !isNaN(value.getTime())) {
+    return Utilities.formatDate(value, tz, 'yyyy-MM-dd');
+  }
+
+  const text = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+
+  const d = new Date(text);
+  return isNaN(d.getTime()) ? '' : Utilities.formatDate(d, tz, 'yyyy-MM-dd');
+}
+
 // ===========================================================================
 // ヘルパー
 // ===========================================================================
@@ -34,6 +47,7 @@ function getOrCreateStatusSheet_(ss) {
     sh.appendRow(['staff_id', '職員', 'status', 'lastTime', 'lastDate']);
     sh.setFrozenRows(1);
   }
+  sh.getRange('A:E').setNumberFormat('@');
   syncStatusStaffRows_(sh);
   return sh;
 }

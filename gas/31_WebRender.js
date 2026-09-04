@@ -24,8 +24,16 @@ function renderPage_(view, ctx) {
    .statusItem.in{border-color:#2e7d32;background:#f0f8f1}
    .statusText{font-weight:700;margin-right:6px}
    .statusTime{color:#666}
+   .barCell{min-width:360px;width:45%}
+   .scaleHead{min-width:360px;width:45%}
+   .scale{position:relative;height:22px}
+   .tick{position:absolute;top:0;transform:translateX(-50%);font-size:11px;color:#666;font-weight:400}
+   .tickLine{position:absolute;top:15px;height:7px;border-left:1px solid #ccc}
+   .barTrack{position:relative;height:20px;background:#f3f3f3;border-radius:2px}
+   .bar{position:absolute;top:2px;bottom:2px;background:#4a90d9;border-radius:2px}
    @media (max-width:700px){
      body{margin:.5em auto;padding:0 10px}
+     .barCell{min-width:220px}
      th,td{font-size:13px;padding:7px 8px}
    }
   </style></head><body>
@@ -46,7 +54,7 @@ function renderPage_(view, ctx) {
   <table>
     <thead>
       <tr><th>日付</th><th>曜日</th><th>休憩</th><th>出勤</th><th>退勤</th>
-          <th>法定内残業</th><th>時間外</th><th>実働</th></tr>
+          <th>法定内残業</th><th>時間外</th><th>実働</th><th class="scaleHead">${renderTimeScale_()}</th></tr>
     </thead>
     <tbody id="attendanceRows">${view.rowsHtml}</tbody>
   </table>
@@ -93,9 +101,26 @@ function renderPage_(view, ctx) {
 }
 
 function renderRows_(summary) {
+  const START = 8;
+  const END = 19;
+  const span = (END - START) * 60;
   let rows = '';
 
   summary.forEach(r => {
+    let bar = '';
+    r.intervals.forEach(([a, b]) => {
+      const end = b || new Date();
+      const day = new Date(r.date + 'T00:00:00');
+      const aMin = (a - day) / 60000;
+      const eMin = (end - day) / 60000;
+      const left = Math.max(0, (aMin - START * 60) / span * 100);
+      const right = Math.min(100, (eMin - START * 60) / span * 100);
+      const width = right - left;
+      if (width > 0) {
+        bar += '<div class="bar" style="left:' + left + '%;width:' + width + '%"></div>';
+      }
+    });
+
     rows += '<tr>' +
       '<td>' + escapeHtml_(r.date) + '</td>' +
       '<td>' + escapeHtml_(r.week) + '</td>' +
@@ -105,10 +130,25 @@ function renderRows_(summary) {
       '<td>' + escapeHtml_(r.legalOtM > 0 ? fmtMin_(r.legalOtM) : '') + '</td>' +
       '<td>' + escapeHtml_(r.statutoryOtM > 0 ? fmtMin_(r.statutoryOtM) : '') + '</td>' +
       '<td>' + escapeHtml_(fmtMin_(r.workM)) + '</td>' +
+      '<td class="barCell"><div class="barTrack">' + bar + '</div></td>' +
     '</tr>';
   });
 
-  return rows || '<tr><td colspan="8">この月の記録はありません</td></tr>';
+  return rows || '<tr><td colspan="9">この月の記録はありません</td></tr>';
+}
+
+function renderTimeScale_() {
+  const START = 8;
+  const END = 19;
+  const span = END - START;
+  let html = '<div class="scale">';
+  for (let h = START; h <= END; h++) {
+    const left = (h - START) / span * 100;
+    html += '<span class="tick" style="left:' + left + '%">' + h + '</span>';
+    html += '<span class="tickLine" style="left:' + left + '%"></span>';
+  }
+  html += '</div>';
+  return html;
 }
 
 function renderStatusList_(statuses) {

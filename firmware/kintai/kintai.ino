@@ -171,6 +171,47 @@ void blink(bool ok) {
   }
 }
 
+bool parsePunchPayload(const String& payload, char* kindOut, size_t kindOutSize) {
+  bool ok = payload.indexOf("\"ok\":true") >= 0;
+  if (ok && kindOutSize > 0) {
+    if (payload.indexOf("\"kind\":\"in\"") >= 0) {
+      snprintf(kindOut, kindOutSize, "%s", "IN");
+    } else if (payload.indexOf("\"kind\":\"out\"") >= 0) {
+      snprintf(kindOut, kindOutSize, "%s", "OUT");
+    } else if (payload.indexOf("\"kind\":\"duplicate\"") >= 0) {
+      snprintf(kindOut, kindOutSize, "%s", "DUP");
+    }
+  }
+  return ok;
+}
+
+bool fetchRedirectPayload(const String& location, char* kindOut, size_t kindOutSize) {
+  if (location.length() == 0) return false;
+
+  WiFiClientSecure client;
+  client.setInsecure();
+  client.setHandshakeTimeout(30);
+
+  HTTPClient http;
+  http.begin(client, location);
+  http.setConnectTimeout(15000);
+  http.setTimeout(20000);
+  http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
+
+  int code = http.GET();
+  Serial.print("redirect code="); Serial.println(code);
+
+  bool ok = false;
+  if (code == HTTP_CODE_OK) {
+    String payload = http.getString();
+    Serial.print("応答 -> "); Serial.println(payload);
+    ok = parsePunchPayload(payload, kindOut, kindOutSize);
+  }
+
+  http.end();
+  return ok;
+}
+
 bool sendPunch(const char* staffId, char* kindOut, size_t kindOutSize) {
   if (kindOutSize > 0) kindOut[0] = '\0';
 
@@ -194,32 +235,28 @@ bool sendPunch(const char* staffId, char* kindOut, size_t kindOutSize) {
   http.setConnectTimeout(15000);
   http.setTimeout(20000);
   http.addHeader("Content-Type", "text/plain");
-  // 追従しない。302が来たら「受理された」とみなす。
   http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
+  const char* headerKeys[] = {"Location"};
+  http.collectHeaders(headerKeys, 1);
 
   String body = String("{\"token\":\"") + TOKEN +
                 "\",\"staff_id\":\"" + staffId + "\"}";
   int code = http.POST(body);
   Serial.print("code="); Serial.println(code);
 
-  // 200(直接応答) か 302(結果ページへ誘導=処理成功) を成功とみなす
-  bool ok = (code == HTTP_CODE_OK ||
-             code == HTTP_CODE_FOUND ||          // 302
-             code == HTTP_CODE_MOVED_PERMANENTLY); // 301
+  bool ok = false;
 
   if (code == HTTP_CODE_OK) {
     String payload = http.getString();
-    ok = payload.indexOf("\"ok\":true") >= 0;
-    if (ok && kindOutSize > 0) {
-      if (payload.indexOf("\"kind\":\"in\"") >= 0) {
-        snprintf(kindOut, kindOutSize, "%s", "IN");
-      } else if (payload.indexOf("\"kind\":\"out\"") >= 0) {
-        snprintf(kindOut, kindOutSize, "%s", "OUT");
-      } else if (payload.indexOf("\"kind\":\"duplicate\"") >= 0) {
-        snprintf(kindOut, kindOutSize, "%s", "DUP");
-      }
-    }
     Serial.print("応答 -> "); Serial.println(payload);
+    ok = parsePunchPayload(payload, kindOut, kindOutSize);
+  } else if (code == HTTP_CODE_FOUND || code == HTTP_CODE_MOVED_PERMANENTLY) {
+    String location = http.header("Location");
+    Serial.print("Location="); Serial.println(location);
+    http.end();
+    ok = fetchRedirectPayload(location, kindOut, kindOutSize);
+    lastWifiUse = millis();
+    return ok;
   }
   http.end();
   lastWifiUse = millis();

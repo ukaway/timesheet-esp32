@@ -44,8 +44,8 @@ function doPost(e) {
     }
 
     // 日が変わっていたら必ず in。当日中は現在状態を反転する。
-    const lastDate = String(state.values[4] || '');
-    const lastStatus = String(state.values[2] || 'out');
+    const lastDate = toDateKey_(state.values[4], tz) || toDateKey_(state.values[3], tz);
+    const lastStatus = String(state.values[2] || 'out').trim().toLowerCase();
     const kind = (lastDate === today && lastStatus === 'in') ? 'out' : 'in';
 
     logSh.appendRow([nowStr, staffId, STAFF[staffId].name, kind]);
