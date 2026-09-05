@@ -40,7 +40,7 @@ function doPost(e) {
 
     // 連打ロックアウト（この職員の最新状態だけを見る）
     if (lastTime && !isNaN(lastTime.getTime()) && (now - lastTime) < CONFIG.LOCKOUT_MS) {
-      return json_({ ok: true, kind: 'duplicate', status: state.values[2] || 'out' });
+      return json_({ ok: true, kind: 'duplicate' });
     }
 
     // 日が変わっていたら必ず in。当日中は現在状態を反転する。
@@ -51,7 +51,7 @@ function doPost(e) {
     logSh.appendRow([nowStr, staffId, STAFF[staffId].name, kind]);
     statusSh.getRange(state.row, 1, 1, 5)
       .setValues([[staffId, STAFF[staffId].name, kind, nowStr, today]]);
-    return json_({ ok: true, kind: kind, status: kind });
+    return json_({ ok: true, kind: kind });
 
   } catch (err) {
     return json_({ ok: false, error: String(err) });

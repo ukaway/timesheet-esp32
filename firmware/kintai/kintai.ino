@@ -27,6 +27,7 @@ const int LED_PIN = 2;
 const unsigned long DEBOUNCE_MS  = 50;
 const unsigned long LOCKOUT_MS   = 3000;
 const unsigned long WIFI_TIMEOUT = 15000;
+const unsigned long HTTP_TIMEOUT = 8000;
 const unsigned long WIFI_KEEPALIVE_MS = 10UL * 60UL * 1000UL;
 const unsigned long DISPLAY_IDLE_MS = 30UL * 1000UL;
 const bool DEBUG_WIFI = true;
@@ -195,7 +196,7 @@ bool fetchRedirectPayload(const String& location, char* kindOut, size_t kindOutS
   HTTPClient http;
   http.begin(client, location);
   http.setConnectTimeout(15000);
-  http.setTimeout(20000);
+  http.setTimeout(HTTP_TIMEOUT);
   http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
 
   int code = http.GET();
@@ -212,7 +213,7 @@ bool fetchRedirectPayload(const String& location, char* kindOut, size_t kindOutS
   return ok;
 }
 
-bool sendPunch(const char* staffId, char* kindOut, size_t kindOutSize) {
+bool sendPunch(const char* staffId, const char* staffName, char* kindOut, size_t kindOutSize) {
   if (kindOutSize > 0) kindOut[0] = '\0';
 
   if (WiFi.status() != WL_CONNECTED) {
@@ -225,6 +226,7 @@ bool sendPunch(const char* staffId, char* kindOut, size_t kindOutSize) {
   lastWifiUse = millis();
 
   showMessage("SENDING", "", "");
+  WiFi.setSleep(false);
 
   WiFiClientSecure client;
   client.setInsecure();
@@ -233,7 +235,7 @@ bool sendPunch(const char* staffId, char* kindOut, size_t kindOutSize) {
   HTTPClient http;
   http.begin(client, GAS_URL);
   http.setConnectTimeout(15000);
-  http.setTimeout(20000);
+  http.setTimeout(HTTP_TIMEOUT);
   http.addHeader("Content-Type", "text/plain");
   http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
   const char* headerKeys[] = {"Location"};
@@ -247,19 +249,23 @@ bool sendPunch(const char* staffId, char* kindOut, size_t kindOutSize) {
   bool ok = false;
 
   if (code == HTTP_CODE_OK) {
+    showMessage("SENT", staffName, "");
     String payload = http.getString();
     Serial.print("応答 -> "); Serial.println(payload);
     ok = parsePunchPayload(payload, kindOut, kindOutSize);
   } else if (code == HTTP_CODE_FOUND || code == HTTP_CODE_MOVED_PERMANENTLY) {
+    showMessage("SENT", staffName, "");
     String location = http.header("Location");
     Serial.print("Location="); Serial.println(location);
     http.end();
     ok = fetchRedirectPayload(location, kindOut, kindOutSize);
     lastWifiUse = millis();
+    WiFi.setSleep(true);
     return ok;
   }
   http.end();
   lastWifiUse = millis();
+  WiFi.setSleep(true);
   return ok;
 }
 
@@ -286,7 +292,7 @@ void loop() {
         lastPress[i] = now;
         showMessage("PUSH", STAFF_NAMES[i], "");
         char kind[4];
-        bool ok = sendPunch(STAFF_IDS[i], kind, sizeof(kind));
+        bool ok = sendPunch(STAFF_IDS[i], STAFF_NAMES[i], kind, sizeof(kind));
         blink(ok);
         showMessage(ok ? "OK" : "FAILED", STAFF_NAMES[i], kind);
       }
