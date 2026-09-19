@@ -83,11 +83,48 @@ const STAFF_NAMES = Object.keys(DEFAULT_STAFF_NAMES).reduce((m, id) => {
 // 職員メールはスクリプト プロパティ KINTAI_STAFF_EMAILS_JSON に置く。
 const STAFF_EMAILS = getJsonScriptProp_('KINTAI_STAFF_EMAILS_JSON', {});
 
+// 働き方テンプレートはスクリプト プロパティ KINTAI_WORK_STYLES_JSON で上書きできる。
+// schedule は曜日種別ごとの所定勤務区間。法定内残業・遅早時間の基準に使う。
+const DEFAULT_WORK_STYLES = {
+  normal_full_time: {
+    type: 'full_time',
+    schedule: {
+      weekday: [['08:30', '13:00'], ['14:00', '17:00']],
+      saturday: [['08:30', '13:00'], ['14:00', '16:00']]
+    }
+  },
+  early_full_time: {
+    type: 'full_time',
+    schedule: {
+      weekday: [['07:00', '12:30'], ['14:30', '17:00']],
+      saturday: [['07:00', '12:30'], ['14:30', '16:00']]
+    }
+  },
+  hourly_part_time: {
+    type: 'hourly',
+    schedule: {
+      weekday: [['09:00', '13:00'], ['14:00', '15:00']],
+      saturday: [['09:00', '13:00'], ['14:00', '15:00']]
+    }
+  }
+};
+const WORK_STYLE_OVERRIDES = getJsonScriptProp_('KINTAI_WORK_STYLES_JSON', {});
+const WORK_STYLES = Object.assign({}, DEFAULT_WORK_STYLES, WORK_STYLE_OVERRIDES);
+
+// 職員ごとの働き方ID。未設定の職員は normal_full_time。
+const STAFF_WORK_STYLES = getJsonScriptProp_('KINTAI_STAFF_WORK_STYLES_JSON', {});
+
+const ATTENDANCE_RULES = {
+  LATE_EARLY_GRACE_MIN: Number(getScriptProp_('KINTAI_LATE_EARLY_GRACE_MIN', '10')) || 10,
+  LEGAL_DAILY_LIMIT_MIN: 8 * 60
+};
+
 // 職員マスタ: staff_id -> { name(=タブ名), email }
 const STAFF = Object.keys(STAFF_NAMES).reduce((m, id) => {
   m[id] = {
     name: STAFF_NAMES[id],
-    email: String(STAFF_EMAILS[id] || '').trim()
+    email: String(STAFF_EMAILS[id] || '').trim(),
+    workStyleId: String(STAFF_WORK_STYLES[id] || 'normal_full_time').trim()
   };
   return m;
 }, {});

@@ -5,12 +5,109 @@ function fmtMin_(min) {
   return `${h}:${('0' + m).slice(-2)}`;
 }
 
-function calcOvertimeBreakdown_(workMin) {
-  const scheduledMin = 7 * 60 + 30;
-  const statutoryMin = 8 * 60;
+function fmtSignedMin_(min) {
+  min = Math.round(min);
+  if (min === 0) return '0:00';
+  return (min < 0 ? '-' : '') + fmtMin_(Math.abs(min));
+}
+
+function calcOvertimeBreakdown_(workMin, scheduledMin) {
+  const statutoryMin = ATTENDANCE_RULES.LEGAL_DAILY_LIMIT_MIN;
   return {
     legalOtM: Math.max(0, Math.min(workMin, statutoryMin) - scheduledMin),
     statutoryOtM: Math.max(0, workMin - statutoryMin)
+  };
+}
+
+function getWorkStyleForStaff_(staffId) {
+  const styleId = STAFF[staffId] && STAFF[staffId].workStyleId
+    ? STAFF[staffId].workStyleId
+    : 'normal_full_time';
+  return WORK_STYLES[styleId] || WORK_STYLES.normal_full_time;
+}
+
+function getDayKind_(dateStr) {
+  const dow = new Date(dateStr + 'T00:00:00').getDay();
+  if (dow === 0) return 'sunday';
+  if (dow === 6) return 'saturday';
+  return 'weekday';
+}
+
+function parseTimeMin_(hhmm) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(hhmm || '').trim());
+  if (!m) return null;
+  return Number(m[1]) * 60 + Number(m[2]);
+}
+
+function getScheduledSegments_(staffId, dateStr) {
+  const style = getWorkStyleForStaff_(staffId);
+  const schedule = style.schedule || {};
+  const dayKind = getDayKind_(dateStr);
+  const source = schedule[dayKind] || [];
+  return source.map(pair => {
+    return [parseTimeMin_(pair[0]), parseTimeMin_(pair[1])];
+  }).filter(pair => pair[0] != null && pair[1] != null && pair[1] > pair[0]);
+}
+
+function sumSegmentsMin_(segments) {
+  return segments.reduce((sum, pair) => sum + pair[1] - pair[0], 0);
+}
+
+function dateAtMinute_(dateStr, minute) {
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setMinutes(minute);
+  return d;
+}
+
+function calcOverlapMin_(intervals, dateStr, segments) {
+  let total = 0;
+  intervals.forEach(([start, end]) => {
+    const finish = end || new Date();
+    segments.forEach(([segStartM, segEndM]) => {
+      const segStart = dateAtMinute_(dateStr, segStartM);
+      const segEnd = dateAtMinute_(dateStr, segEndM);
+      const overlapStart = Math.max(start.getTime(), segStart.getTime());
+      const overlapEnd = Math.min(finish.getTime(), segEnd.getTime());
+      if (overlapEnd > overlapStart) total += (overlapEnd - overlapStart) / 60000;
+    });
+  });
+  return total;
+}
+
+function calcBeforeFirstScheduledMin_(intervals, dateStr, segments) {
+  if (segments.length === 0) return 0;
+  const firstStartM = segments.reduce((min, pair) => Math.min(min, pair[0]), segments[0][0]);
+  return calcOverlapMin_(intervals, dateStr, [[0, firstStartM]]);
+}
+
+function calcAttendanceMetrics_(staffId, dateStr, intervals, workMin) {
+  const style = getWorkStyleForStaff_(staffId);
+  const scheduledSegments = getScheduledSegments_(staffId, dateStr);
+  const scheduledMin = sumSegmentsMin_(scheduledSegments);
+  const scheduledWorkMin = calcOverlapMin_(intervals, dateStr, scheduledSegments);
+  const earlyBeforeScheduleM = calcBeforeFirstScheduledMin_(intervals, dateStr, scheduledSegments);
+  const overtimeBaseM = style.type === 'full_time'
+    ? Math.max(0, workMin - earlyBeforeScheduleM)
+    : workMin;
+  const shortageMin = Math.max(0, scheduledMin - scheduledWorkMin);
+  const lateEarlyM = style.type === 'full_time' &&
+      scheduledMin > 0 &&
+      shortageMin >= ATTENDANCE_RULES.LATE_EARLY_GRACE_MIN
+    ? shortageMin
+    : 0;
+  const overtime = style.type === 'full_time' && scheduledMin > 0
+    ? calcOvertimeBreakdown_(overtimeBaseM, scheduledMin)
+    : { legalOtM: 0, statutoryOtM: Math.max(0, overtimeBaseM - ATTENDANCE_RULES.LEGAL_DAILY_LIMIT_MIN) };
+
+  return {
+    workStyleType: style.type || '',
+    scheduledM: scheduledMin,
+    scheduledWorkM: scheduledWorkMin,
+    earlyBeforeScheduleM: earlyBeforeScheduleM,
+    overtimeBaseM: overtimeBaseM,
+    lateEarlyM: lateEarlyM,
+    legalOtM: overtime.legalOtM,
+    statutoryOtM: overtime.statutoryOtM
   };
 }
 

@@ -3,7 +3,7 @@
  * 勤怠サマリ生成（別スプレッドシート出力可）
  * 打刻ログ [日時, staff_id, 職員, in/out] → 日次サマリ表を書き出す。
  *
- * 列: A日付 B曜日 C勤務 D出勤 E退勤 F休憩 G法定内残業 H時間外 I実働
+ * 列: A日付 B曜日 C勤務 D出勤 E退勤 F休憩 G遅早 H法定内残業 I時間外 J実働
  */
 
 // ===== サマリ設定 =====
@@ -50,7 +50,7 @@ function buildSummaryForStaff_(srcSheet, outSs, outSheetName, tz, staffId) {
   }
 
   const dates = Object.keys(events).sort();
-  const header = ['日付', '曜日', '勤務', '出勤', '退勤', '休憩', '法定内残業', '時間外', '実働'];
+  const header = ['日付', '曜日', '勤務', '出勤', '退勤', '休憩', '遅早', '法定内残業', '時間外', '実働'];
 
   // 出力タブは毎回作り直す（結合残り・古いデータを完全排除）
   const existing = outSs.getSheetByName(outSheetName);
@@ -64,6 +64,7 @@ function buildSummaryForStaff_(srcSheet, outSs, outSheetName, tz, staffId) {
     40, // 出勤
     40, // 退勤
     40, // 休憩
+    50, // 遅早
     70, // 法定内残業
     50, // 時間外
     40  // 実働
@@ -101,7 +102,7 @@ function buildSummaryForStaff_(srcSheet, outSs, outSheetName, tz, staffId) {
     let workMin = 0;
     intervals.forEach(([a, b]) => { workMin += ((b || new Date()) - a) / 60000; });
 
-    const overtime = calcOvertimeBreakdown_(workMin);
+    const metrics = calcAttendanceMetrics_(staffId, dateStr, intervals, workMin);
 
     const dObj = new Date(dateStr + 'T00:00:00');
     dataRows.push([
@@ -109,19 +110,20 @@ function buildSummaryForStaff_(srcSheet, outSs, outSheetName, tz, staffId) {
       Utilities.formatDate(firstIn, tz, 'HH:mm'),
       stillIn ? '勤務中' : Utilities.formatDate(lastOut, tz, 'HH:mm'),
       fmtMin_(breakMin),
-      overtime.legalOtM > 0 ? fmtMin_(overtime.legalOtM) : '',
-      overtime.statutoryOtM > 0 ? fmtMin_(overtime.statutoryOtM) : '',
+      metrics.lateEarlyM > 0 ? fmtSignedMin_(-metrics.lateEarlyM) : '',
+      metrics.legalOtM > 0 ? fmtMin_(metrics.legalOtM) : '',
+      metrics.statutoryOtM > 0 ? fmtMin_(metrics.statutoryOtM) : '',
       fmtMin_(workMin),
     ]);
   });
 
   if (dataRows.length === 0) return;
 
-  // A〜I列の値を一括書き込み
-  out.getRange(2, 1, dataRows.length, 9).setValues(dataRows);
+  // A〜J列の値を一括書き込み
+  out.getRange(2, 1, dataRows.length, 10).setValues(dataRows);
 
-  // A〜I列の値を左揃え
-  out.getRange(1, 1, dataRows.length + 1, 9).setHorizontalAlignment('left');
+  // A〜J列の値を左揃え
+  out.getRange(1, 1, dataRows.length + 1, 10).setHorizontalAlignment('left');
 }
 
 // 日次トリガー設置（手動で一度実行）

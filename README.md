@@ -87,6 +87,9 @@ KINTAI_ADMIN_EMAILS
 KINTAI_SUMMARY_OUTPUT_SS_ID
 KINTAI_STAFF_NAMES_JSON
 KINTAI_STAFF_EMAILS_JSON
+KINTAI_STAFF_WORK_STYLES_JSON
+KINTAI_WORK_STYLES_JSON
+KINTAI_LATE_EARLY_GRACE_MIN
 ```
 
 `KINTAI_STAFF_NAMES_JSON` は職員IDと表示名の対応をJSONで持ちます。
@@ -99,6 +102,12 @@ KINTAI_STAFF_EMAILS_JSON
 
 ```json
 {"staff1":"doctor@example.com","staff2":"nurse-a@example.com"}
+```
+
+`KINTAI_STAFF_WORK_STYLES_JSON` は職員IDと働き方IDの対応をJSONで持ちます。未指定の職員は `normal_full_time` です。
+
+```json
+{"staff1":"normal_full_time","staff2":"early_full_time","staff3":"hourly_part_time"}
 ```
 
 ## ESP32セットアップ
