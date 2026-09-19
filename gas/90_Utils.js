@@ -80,11 +80,24 @@ function calcBeforeFirstScheduledMin_(intervals, dateStr, segments) {
   return calcOverlapMin_(intervals, dateStr, [[0, firstStartM]]);
 }
 
+function getScheduledSpan_(segments) {
+  if (segments.length === 0) return null;
+  return segments.reduce((span, pair) => {
+    return [
+      Math.min(span[0], pair[0]),
+      Math.max(span[1], pair[1])
+    ];
+  }, [segments[0][0], segments[0][1]]);
+}
+
 function calcAttendanceMetrics_(staffId, dateStr, intervals, workMin) {
   const style = getWorkStyleForStaff_(staffId);
   const scheduledSegments = getScheduledSegments_(staffId, dateStr);
   const scheduledMin = sumSegmentsMin_(scheduledSegments);
-  const scheduledWorkMin = calcOverlapMin_(intervals, dateStr, scheduledSegments);
+  const scheduledSpan = getScheduledSpan_(scheduledSegments);
+  const scheduledWorkMin = scheduledSpan
+    ? calcOverlapMin_(intervals, dateStr, [scheduledSpan])
+    : 0;
   const earlyBeforeScheduleM = calcBeforeFirstScheduledMin_(intervals, dateStr, scheduledSegments);
   const overtimeBaseM = style.type === 'full_time'
     ? Math.max(0, workMin - earlyBeforeScheduleM)
