@@ -173,7 +173,7 @@ function summarizeDaily_(sh, tz, month, staffId) {
       workM += ((end || new Date()) - start) / 60000;
     });
 
-    const metrics = calcAttendanceMetrics_(staffId, dateStr, intervals, workM);
+    const metrics = calcAttendanceMetrics_(staffId, dateStr, intervals, workM, breakM);
 
     result.push({
       date: dateStr,

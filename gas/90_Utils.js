@@ -11,6 +11,12 @@ function fmtSignedMin_(min) {
   return (min < 0 ? '-' : '') + fmtMin_(Math.abs(min));
 }
 
+function requiredLegalBreakMin_(workMin) {
+  if (workMin > 8 * 60) return 60;
+  if (workMin > 6 * 60) return 45;
+  return 0;
+}
+
 function getWorkStyleForStaff_(staffId) {
   const styleId = STAFF[staffId] && STAFF[staffId].workStyleId
     ? STAFF[staffId].workStyleId
@@ -87,7 +93,7 @@ function getScheduledSpan_(segments) {
   }, [segments[0][0], segments[0][1]]);
 }
 
-function calcAttendanceMetrics_(staffId, dateStr, intervals, workMin) {
+function calcAttendanceMetrics_(staffId, dateStr, intervals, workMin, breakMin) {
   const style = getWorkStyleForStaff_(staffId);
   const scheduledSegments = getScheduledSegments_(staffId, dateStr);
   const scheduledMin = sumSegmentsMin_(scheduledSegments);
@@ -102,6 +108,9 @@ function calcAttendanceMetrics_(staffId, dateStr, intervals, workMin) {
   const actualBreakInScheduledSpanM = Math.max(0, scheduledSpanMin - scheduledWorkMin);
   const shortBreakM = Math.max(0, scheduledBreakM - actualBreakInScheduledSpanM);
   const overtimeBaseM = workMin;
+  const requiredLegalBreakM = requiredLegalBreakMin_(overtimeBaseM);
+  const legalBreakShortageM = Math.max(0, requiredLegalBreakM - (breakMin || 0));
+  const adjustedWorkM = overtimeBaseM + legalBreakShortageM;
   const shortageMin = Math.max(0, scheduledMin - scheduledWorkMin);
   const lateEarlyM = style.type === 'full_time' &&
       scheduledMin > 0 &&
@@ -109,11 +118,12 @@ function calcAttendanceMetrics_(staffId, dateStr, intervals, workMin) {
     ? shortageMin
     : 0;
   const outsideWorkM = earlyBeforeScheduleM + afterScheduledSpanM + shortBreakM;
-  const overScheduledM = Math.max(0, overtimeBaseM - scheduledMin);
-  const scheduledOutsideM = style.type === 'full_time' && scheduledMin > 0
-    ? (overScheduledM > 0 ? overScheduledM : outsideWorkM)
-    : 0;
-  const statutoryOtM = Math.max(0, overtimeBaseM - ATTENDANCE_RULES.LEGAL_DAILY_LIMIT_MIN);
+  const outsideWorkWithLegalBreakM = outsideWorkM + legalBreakShortageM;
+  const overScheduledM = Math.max(0, adjustedWorkM - scheduledMin);
+  const scheduledOutsideM = scheduledMin > 0
+    ? (overScheduledM > 0 ? overScheduledM : outsideWorkWithLegalBreakM)
+    : Math.max(0, adjustedWorkM - ATTENDANCE_RULES.LEGAL_DAILY_LIMIT_MIN);
+  const statutoryOtM = Math.max(0, adjustedWorkM - ATTENDANCE_RULES.LEGAL_DAILY_LIMIT_MIN);
 
   return {
     workStyleType: style.type || '',
@@ -125,7 +135,11 @@ function calcAttendanceMetrics_(staffId, dateStr, intervals, workMin) {
     scheduledBreakM: scheduledBreakM,
     actualBreakInScheduledSpanM: actualBreakInScheduledSpanM,
     shortBreakM: shortBreakM,
+    requiredLegalBreakM: requiredLegalBreakM,
+    legalBreakShortageM: legalBreakShortageM,
+    adjustedWorkM: adjustedWorkM,
     outsideWorkM: outsideWorkM,
+    outsideWorkWithLegalBreakM: outsideWorkWithLegalBreakM,
     overScheduledM: overScheduledM,
     overtimeBaseM: overtimeBaseM,
     lateEarlyM: lateEarlyM,

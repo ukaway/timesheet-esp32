@@ -54,7 +54,7 @@ function renderPage_(view, ctx) {
   <table>
     <thead>
       <tr><th>日付</th><th>曜日</th><th>休憩</th><th>出勤</th><th>退勤</th>
-          <th>遅早</th><th>所定外労働</th><th>時間外</th><th>実働</th><th class="scaleHead">${renderTimeScale_()}</th></tr>
+          <th>遅早</th><th>所定外労働</th><th>うち時間外</th><th>実働</th><th class="scaleHead">${renderTimeScale_()}</th></tr>
     </thead>
     <tbody id="attendanceRows">${view.rowsHtml}</tbody>
   </table>

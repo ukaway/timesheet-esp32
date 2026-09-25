@@ -3,7 +3,7 @@
  * 勤怠サマリ生成（別スプレッドシート出力可）
  * 打刻ログ [日時, staff_id, 職員, in/out] → 日次サマリ表を書き出す。
  *
- * 列: A日付 B曜日 C勤務 D出勤 E退勤 F休憩 G遅早 H所定外労働 I時間外 J実働
+ * 列: A日付 B曜日 C勤務 D出勤 E退勤 F休憩 G遅早 H所定外労働 Iうち時間外 J実働
  */
 
 // ===== サマリ設定 =====
@@ -50,7 +50,7 @@ function buildSummaryForStaff_(srcSheet, outSs, outSheetName, tz, staffId) {
   }
 
   const dates = Object.keys(events).sort();
-  const header = ['日付', '曜日', '勤務', '出勤', '退勤', '休憩', '遅早', '所定外労働', '時間外', '実働'];
+  const header = ['日付', '曜日', '勤務', '出勤', '退勤', '休憩', '遅早', '所定外労働', 'うち時間外', '実働'];
 
   // 出力タブは毎回作り直す（結合残り・古いデータを完全排除）
   const existing = outSs.getSheetByName(outSheetName);
@@ -66,7 +66,7 @@ function buildSummaryForStaff_(srcSheet, outSs, outSheetName, tz, staffId) {
     40, // 休憩
     50, // 遅早
     80, // 所定外労働
-    50, // 時間外
+    70, // うち時間外
     40  // 実働
   ].forEach((width, i) => {
     out.setColumnWidth(i + 1, width);
@@ -102,7 +102,7 @@ function buildSummaryForStaff_(srcSheet, outSs, outSheetName, tz, staffId) {
     let workMin = 0;
     intervals.forEach(([a, b]) => { workMin += ((b || new Date()) - a) / 60000; });
 
-    const metrics = calcAttendanceMetrics_(staffId, dateStr, intervals, workMin);
+    const metrics = calcAttendanceMetrics_(staffId, dateStr, intervals, workMin, breakMin);
 
     const dObj = new Date(dateStr + 'T00:00:00');
     dataRows.push([
