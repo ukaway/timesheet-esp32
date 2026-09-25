@@ -84,7 +84,7 @@ const STAFF_NAMES = Object.keys(DEFAULT_STAFF_NAMES).reduce((m, id) => {
 const STAFF_EMAILS = getJsonScriptProp_('KINTAI_STAFF_EMAILS_JSON', {});
 
 // 働き方テンプレートはスクリプト プロパティ KINTAI_WORK_STYLES_JSON で上書きできる。
-// schedule は曜日種別ごとの所定勤務区間。法定内残業・遅早時間の基準に使う。
+// schedule は曜日種別ごとの所定勤務区間。所定外労働・遅早時間の基準に使う。
 const DEFAULT_WORK_STYLES = {
   normal_full_time: {
     type: 'full_time',

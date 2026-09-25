@@ -122,7 +122,7 @@ function buildAttendanceView_(staffId, month, order, tz) {
 
 /**
  * 指定月の日次サマリ配列を返す。
- * 返却: [{date, week, inStr, outStr, breakM, lateEarlyM, legalOtM, statutoryOtM, workM, intervals, stillIn}]
+ * 返却: [{date, week, inStr, outStr, breakM, lateEarlyM, scheduledOutsideM, statutoryOtM, workM, intervals, stillIn}]
  */
 function summarizeDaily_(sh, tz, month, staffId) {
   const raw = sh.getDataRange().getValues();
@@ -182,7 +182,7 @@ function summarizeDaily_(sh, tz, month, staffId) {
       outStr: stillIn ? '勤務中' : Utilities.formatDate(lastOut, tz, 'HH:mm'),
       breakM: breakM,
       lateEarlyM: metrics.lateEarlyM,
-      legalOtM: metrics.legalOtM,
+      scheduledOutsideM: metrics.scheduledOutsideM,
       statutoryOtM: metrics.statutoryOtM,
       workM: workM,
       intervals: intervals,

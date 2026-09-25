@@ -3,7 +3,7 @@
  * 勤怠サマリ生成（別スプレッドシート出力可）
  * 打刻ログ [日時, staff_id, 職員, in/out] → 日次サマリ表を書き出す。
  *
- * 列: A日付 B曜日 C勤務 D出勤 E退勤 F休憩 G遅早 H法定内残業 I時間外 J実働
+ * 列: A日付 B曜日 C勤務 D出勤 E退勤 F休憩 G遅早 H所定外労働 I時間外 J実働
  */
 
 // ===== サマリ設定 =====
@@ -50,7 +50,7 @@ function buildSummaryForStaff_(srcSheet, outSs, outSheetName, tz, staffId) {
   }
 
   const dates = Object.keys(events).sort();
-  const header = ['日付', '曜日', '勤務', '出勤', '退勤', '休憩', '遅早', '法定内残業', '時間外', '実働'];
+  const header = ['日付', '曜日', '勤務', '出勤', '退勤', '休憩', '遅早', '所定外労働', '時間外', '実働'];
 
   // 出力タブは毎回作り直す（結合残り・古いデータを完全排除）
   const existing = outSs.getSheetByName(outSheetName);
@@ -65,7 +65,7 @@ function buildSummaryForStaff_(srcSheet, outSs, outSheetName, tz, staffId) {
     40, // 退勤
     40, // 休憩
     50, // 遅早
-    70, // 法定内残業
+    80, // 所定外労働
     50, // 時間外
     40  // 実働
   ].forEach((width, i) => {
@@ -111,7 +111,7 @@ function buildSummaryForStaff_(srcSheet, outSs, outSheetName, tz, staffId) {
       stillIn ? '勤務中' : Utilities.formatDate(lastOut, tz, 'HH:mm'),
       fmtMin_(breakMin),
       metrics.lateEarlyM > 0 ? fmtSignedMin_(-metrics.lateEarlyM) : '',
-      metrics.legalOtM > 0 ? fmtMin_(metrics.legalOtM) : '',
+      metrics.scheduledOutsideM > 0 ? fmtMin_(metrics.scheduledOutsideM) : '',
       metrics.statutoryOtM > 0 ? fmtMin_(metrics.statutoryOtM) : '',
       fmtMin_(workMin),
     ]);
