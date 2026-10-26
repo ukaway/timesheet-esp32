@@ -265,7 +265,11 @@ function writePeriodSheet_(sheet, name, start, end, days, records, scheduled) {
   sheet.getRange(first, 11, data.length, 2).setNumberFormat('0');
   sheet.setFrozenRows(headerRow);
   sheet.setFrozenColumns(0);
-  sheet.autoResizeColumns(1, header.length);
+  // G列以降は折り返さず、見出し・日別データの最長表示に幅を合わせる。
+  sheet.getRange(1, 7, last, header.length - 6).setWrap(false);
+  SpreadsheetApp.flush();
+  sheet.autoResizeColumns(1, 6);
+  sheet.autoResizeColumns(7, header.length - 6);
   sheet.getRange('A1').setFontWeight('bold');
   sheet.getRange('K10:L10').setNote('所定日・出勤日は1、該当しない日は0。集計はこの列を参照します。');
 }

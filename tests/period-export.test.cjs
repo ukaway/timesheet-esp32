@@ -6,6 +6,7 @@ process.env.TZ = 'Asia/Tokyo';
 const ctx = vm.createContext({
   STAFF: { a: { name: 'A' }, b: { name: 'B' } },
   getScriptProp_: () => '',
+  SpreadsheetApp: { flush() {} },
   Utilities: { formatDate(date, tz, pattern) {
     const parts = new Intl.DateTimeFormat('sv-SE', {
       timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit',
@@ -45,7 +46,7 @@ test('editable numeric durations, formulas, rest classification and missing cloc
   ]), '2026-09-21', '2026-10-20', 'Asia/Tokyo');
   const writes = [];
   const range = { setValues(value) { writes.push(value); return this; } };
-  for (const method of ['setValue', 'setFontWeight', 'setBackground', 'setNumberFormat', 'setNote']) range[method] = () => range;
+  for (const method of ['setValue', 'setFontWeight', 'setBackground', 'setNumberFormat', 'setNote', 'setWrap']) range[method] = () => range;
   const layout = {};
   const sheet = { getMaxRows: () => 1000, getRange: () => range,
     setFrozenRows(n) { layout.rows = n; },
@@ -59,7 +60,7 @@ test('editable numeric durations, formulas, rest classification and missing cloc
   assert.deepEqual(Array.from(writes[1][0]), ['時間（hh:mm）', '時間（h）']);
   assert.equal(layout.rows, 10);
   assert.equal(layout.columns, 0);
-  assert.deepEqual(layout.resize, [1, 12]);
+  assert.deepEqual(layout.resize, [7, 6]);
   assert.equal(data[0][9], 540 / 1440);
   assert.equal(data[1][2], '要確認（未退勤）');
   assert.equal(data[1][9], '');
