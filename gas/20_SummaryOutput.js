@@ -195,11 +195,11 @@ function exportAttendanceBook(startDate, endDate) {
   const report = buildPeriodReport_(log.getDataRange().getValues(), start, end, tz);
   const activeIds = staffIdsWithRecords_(report);
   if (!activeIds.length) throw new Error('指定期間に出勤記録がありません。');
-  const book = SpreadsheetApp.create('勤怠_' + start + '〜' + end);
+  const book = SpreadsheetApp.create('勤怠_' + start + '~' + end);
   book.setSpreadsheetTimeZone(tz);
   activeIds.forEach((id, index) => {
     // IDを付けて同姓同名や使用不可文字によるタブ名の重複を避ける。
-    const name = (STAFF[id].name + '_' + id).replace(/[\[\]:*?\/\\]/g, '_').slice(0, 90) + '_' + (index + 1);
+    const name = (STAFF[id].name).replace(/[\[\]:*?\/\\]/g, '_').slice(0, 90) + '_' + (index + 1);
     const sheet = index === 0 ? book.getSheets()[0].setName(name) : book.insertSheet(name);
     writePeriodSheet_(sheet, STAFF[id].name, start, end, report.days, report.byStaff[id], report.scheduled);
   });
