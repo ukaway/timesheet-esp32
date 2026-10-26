@@ -56,5 +56,9 @@ test('editable numeric durations, formulas, rest classification and missing cloc
   assert.equal(data[2][2], '全員休み');
   assert.equal(data[29][2], '休み');
   assert.equal(writes[0][0][1], '=SUM(J11:J40)');
+  assert.equal(writes[0][1][1], '=SUM(H11:H40)-SUM(I11:I40)');
+  assert.equal(writes[0][2][1], '=SUM(I11:I40)');
+  assert.equal(data[0][7], 30 / 1440);
+  assert.equal(data[0][8], 10 / 1440);
   assert.equal(writes[0][2][3], '=SUM(K11:K40)-SUM(L11:L40)');
 });

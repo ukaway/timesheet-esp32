@@ -249,8 +249,8 @@ function writePeriodSheet_(sheet, name, start, end, days, records, scheduled) {
   const sum = col => '=SUM(' + col + first + ':' + col + last + ')';
   sheet.getRange(4, 1, 5, 4).setValues([
     ['総労働時間', sum('J'), '総出勤日数', sum('L')],
-    ['所定外労働', sum('H'), '所定日数（全員共通）', sum('K')],
-    ['時間外労働（所定外の内数）', sum('I'), '休み（所定日の本人未出勤）', '=SUM(K' + first + ':K' + last + ')-SUM(L' + first + ':L' + last + ')'],
+    ['総所定外労働（時間外を除く）', sum('H') + '-SUM(I' + first + ':I' + last + ')', '所定日数（全員共通）', sum('K')],
+    ['総時間外労働', sum('I'), '休み（所定日の本人未出勤）', '=SUM(K' + first + ':K' + last + ')-SUM(L' + first + ':L' + last + ')'],
     ['総遅刻早退', sum('G'), '全員休みの日数', '=' + days.length + '-SUM(K' + first + ':K' + last + ')'],
     ['未退勤の時間は集計対象外', '', '要確認日数', '=COUNTIF(C' + first + ':C' + last + ',"要確認*")']
   ]);
