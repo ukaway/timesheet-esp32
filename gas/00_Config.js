@@ -1,5 +1,5 @@
 /**
- * 鵜川医院 勤怠システム — Google Apps Script（サーバー不要）
+ * 勤怠システム — Google Apps Script（サーバー不要）
  *
  * 構成:
  *   ESP32(8ボタン) --HTTPS POST--> doPost --> 打刻ログに追記 + 現在状態を更新

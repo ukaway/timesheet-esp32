@@ -136,3 +136,132 @@ function setupSummaryTrigger() {
     .inTimezone(SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone())
     .create();
 }
+
+// ===== 任意期間の保存用ブック（既存サマリとは別に毎回新規作成） =====
+function onOpen() {
+  SpreadsheetApp.getUi().createMenu('勤怠出力')
+    .addItem('期間を指定してブック保存', 'exportAttendanceBookPrompt')
+    .addToUi();
+}
+
+function exportAttendanceBookPrompt() {
+  const ui = SpreadsheetApp.getUi();
+  const start = ui.prompt('勤怠ブック保存', '開始日（yyyy/mm/dd）', ui.ButtonSet.OK_CANCEL);
+  if (start.getSelectedButton() !== ui.Button.OK) return;
+  const end = ui.prompt('勤怠ブック保存', '終了日（yyyy/mm/dd・当日を含む）', ui.ButtonSet.OK_CANCEL);
+  if (end.getSelectedButton() !== ui.Button.OK) return;
+  try {
+    const result = exportAttendanceBook(start.getResponseText(), end.getResponseText());
+    ui.alert('保存完了', result.url, ui.ButtonSet.OK);
+  } catch (err) {
+    ui.alert('保存できませんでした', err.message, ui.ButtonSet.OK);
+  }
+}
+
+function parseExportDate_(value) {
+  const text = String(value || '').trim();
+  if (!/^\d{4}\/\d{2}\/\d{2}$/.test(text)) {
+    throw new Error('日付は yyyy/mm/dd 形式で入力してください。');
+  }
+  const key = text.replace(/\//g, '-');
+  const date = new Date(key + 'T00:00:00Z');
+  if (isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== key) {
+    throw new Error('存在する日付を入力してください。');
+  }
+  return key;
+}
+
+/** 全職員1人1シート。元ログや過去の保存ブックは変更しない。 */
+function exportAttendanceBook(startDate, endDate) {
+  const email = (Session.getActiveUser().getEmail() || '').toLowerCase();
+  if (!email || !ADMIN_SET.has(email)) throw new Error('全職員の勤怠出力は管理者のみ利用できます。');
+  const start = parseExportDate_(startDate);
+  const end = parseExportDate_(endDate);
+  if (start > end) throw new Error('終了日は開始日以降にしてください。');
+  const src = SpreadsheetApp.getActiveSpreadsheet();
+  const tz = src.getSpreadsheetTimeZone();
+  const today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+  if (end > today) throw new Error('未来の日付は指定できません。');
+  const ids = Object.keys(STAFF);
+  if (!ids.length) throw new Error('職員が登録されていません。');
+  const log = src.getSheetByName(CONFIG.LOG_SHEET);
+  if (!log) throw new Error('打刻ログがありません。');
+  const report = buildPeriodReport_(log.getDataRange().getValues(), start, end, tz);
+  const book = SpreadsheetApp.create('勤怠_' + start + '〜' + end);
+  book.setSpreadsheetTimeZone(tz);
+  ids.forEach((id, index) => {
+    // IDを付けて同姓同名や使用不可文字によるタブ名の重複を避ける。
+    const name = (STAFF[id].name + '_' + id).replace(/[\[\]:*?\/\\]/g, '_').slice(0, 90) + '_' + (index + 1);
+    const sheet = index === 0 ? book.getSheets()[0].setName(name) : book.insertSheet(name);
+    writePeriodSheet_(sheet, STAFF[id].name, start, end, report.days, report.byStaff[id], report.scheduled);
+  });
+  SpreadsheetApp.flush();
+  return { url: book.getUrl(), id: book.getId() };
+}
+
+function buildPeriodReport_(raw, start, end, tz) {
+  const days = [];
+  for (let d = new Date(start + 'T00:00:00Z'); d.toISOString().slice(0, 10) <= end; d.setUTCDate(d.getUTCDate() + 1)) {
+    days.push(d.toISOString().slice(0, 10));
+  }
+  // 全員の所定日判定も、出力時点の同じログを使う。
+  const filtered = [raw[0] || []];
+  raw.slice(1).forEach(row => {
+    if (!row[0]) return;
+    const t = new Date(row[0]);
+    if (isNaN(t.getTime())) return;
+    const key = Utilities.formatDate(t, tz, 'yyyy-MM-dd');
+    if (key >= start && key <= end && (row[3] === 'in' || row[3] === 'out')) filtered.push(row);
+  });
+  const source = { getDataRange: () => ({ getValues: () => filtered }) };
+  const months = [...new Set(days.map(d => d.slice(0, 7)))];
+  const byStaff = {};
+  const scheduled = new Set();
+  Object.keys(STAFF).forEach(id => {
+    const rows = months.reduce((all, month) => all.concat(summarizeDaily_(source, tz, month, id)), []);
+    byStaff[id] = {};
+    rows.forEach(row => {
+      byStaff[id][row.date] = row;
+      scheduled.add(row.date);
+    });
+  });
+  return { days: days, byStaff: byStaff, scheduled: scheduled };
+}
+
+function writePeriodSheet_(sheet, name, start, end, days, records, scheduled) {
+  const headerRow = 10;
+  const first = headerRow + 1;
+  const last = headerRow + days.length;
+  const header = ['日付', '曜日', '区分', '出勤', '退勤', '休憩', '遅刻早退', '所定外労働', '時間外労働', '実働', '所定日', '出勤日'];
+  if (sheet.getMaxRows() < last) sheet.insertRowsAfter(sheet.getMaxRows(), last - sheet.getMaxRows());
+  const data = days.map(day => {
+    const r = records[day];
+    const weekday = WEEK_JP[new Date(day + 'T00:00:00Z').getUTCDay()];
+    if (!r) return [day.replace(/-/g, '/'), weekday, scheduled.has(day) ? '休み' : '全員休み', '', '', 0, 0, 0, 0, 0, scheduled.has(day) ? 1 : 0, 0];
+    // 未退勤を現在時刻まで延長して確定値として保存しない。
+    const duration = m => r.stillIn ? '' : Math.round(m) / 1440;
+    return [day.replace(/-/g, '/'), weekday, r.stillIn ? '要確認（未退勤）' : '出勤', r.inStr, r.outStr,
+      duration(r.breakM), duration(r.lateEarlyM), duration(r.scheduledOutsideM), duration(r.statutoryOtM), duration(r.workM), 1, 1];
+  });
+  sheet.getRange('A1').setValue(name + ' 勤怠記録');
+  sheet.getRange('A2').setValue(start.replace(/-/g, '/') + '〜' + end.replace(/-/g, '/') + '（両端含む）');
+  const sum = col => '=SUM(' + col + first + ':' + col + last + ')';
+  sheet.getRange(4, 1, 5, 4).setValues([
+    ['総労働時間', sum('J'), '総出勤日数', sum('L')],
+    ['所定外労働', sum('H'), '所定日数（全員共通）', sum('K')],
+    ['時間外労働（所定外の内数）', sum('I'), '休み（所定日の本人未出勤）', '=SUM(K' + first + ':K' + last + ')-SUM(L' + first + ':L' + last + ')'],
+    ['総遅刻早退', sum('G'), '全員休みの日数', '=' + days.length + '-SUM(K' + first + ':K' + last + ')'],
+    ['未退勤の時間は集計対象外', '', '要確認日数', '=COUNTIF(C' + first + ':C' + last + ',"要確認*")']
+  ]);
+  sheet.getRange('B4:B7').setNumberFormat('[h]:mm');
+  sheet.getRange('D4:D8').setNumberFormat('0');
+  sheet.getRange(headerRow, 1, 1, header.length).setValues([header]).setFontWeight('bold').setBackground('#dce6f1');
+  sheet.getRange(first, 1, data.length, header.length).setValues(data);
+  sheet.getRange(first, 6, data.length, 5).setNumberFormat('[h]:mm');
+  sheet.getRange(first, 11, data.length, 2).setNumberFormat('0');
+  sheet.setFrozenRows(headerRow);
+  sheet.setFrozenColumns(3);
+  sheet.autoResizeColumns(1, header.length);
+  sheet.getRange('A1').setFontWeight('bold');
+  sheet.getRange('K10:L10').setNote('所定日・出勤日は1、該当しない日は0。集計はこの列を参照します。');
+}

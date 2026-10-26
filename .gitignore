@@ -19,3 +19,6 @@ firmware/**/secrets.h
 # Legacy GAS files kept locally after splitting by responsibility
 gas/コード.js
 gas/Webアプリ.js
+
+# Local GAS project connection (keep project IDs out of Git)
+.clasp.json
