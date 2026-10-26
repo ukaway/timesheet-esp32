@@ -102,10 +102,7 @@ const DEFAULT_WORK_STYLES = {
   },
   hourly_part_time: {
     type: 'hourly',
-    schedule: {
-      weekday: [['09:00', '13:00'], ['14:00', '15:00']],
-      saturday: [['09:00', '13:00'], ['14:00', '15:00']]
-    }
+    schedule: {} // 所定時間なし。実働8時間超のみ時間外。
   }
 };
 const WORK_STYLE_OVERRIDES = getJsonScriptProp_('KINTAI_WORK_STYLES_JSON', {});

@@ -39,6 +39,8 @@ function parseTimeMin_(hhmm) {
 
 function getScheduledSegments_(staffId, dateStr) {
   const style = getWorkStyleForStaff_(staffId);
+  // 時給制には所定時間を設けない。既存プロパティにscheduleがあっても使わない。
+  if (style.type === 'hourly') return [];
   const schedule = style.schedule || {};
   const dayKind = getDayKind_(dateStr);
   const source = schedule[dayKind] || [];
@@ -120,10 +122,13 @@ function calcAttendanceMetrics_(staffId, dateStr, intervals, workMin, breakMin) 
   const outsideWorkM = earlyBeforeScheduleM + afterScheduledSpanM + shortBreakM;
   const outsideWorkWithLegalBreakM = outsideWorkM + legalBreakShortageM;
   const overScheduledM = Math.max(0, adjustedWorkM - scheduledMin);
-  const scheduledOutsideM = scheduledMin > 0
+  const overtimeWorkM = style.type === 'hourly' ? workMin : adjustedWorkM;
+  const statutoryOtM = Math.max(0, overtimeWorkM - ATTENDANCE_RULES.LEGAL_DAILY_LIMIT_MIN);
+  const scheduledOutsideM = style.type === 'hourly'
+    ? statutoryOtM
+    : scheduledMin > 0
     ? (overScheduledM > 0 ? overScheduledM : outsideWorkWithLegalBreakM)
     : Math.max(0, adjustedWorkM - ATTENDANCE_RULES.LEGAL_DAILY_LIMIT_MIN);
-  const statutoryOtM = Math.max(0, adjustedWorkM - ATTENDANCE_RULES.LEGAL_DAILY_LIMIT_MIN);
 
   return {
     workStyleType: style.type || '',
