@@ -22,11 +22,16 @@ test('hourly ignores old scheduled segments and has no lateness', () => {
   assert.equal(m.lateEarlyM, 0);
   assert.equal(m.scheduledOutsideM, 0);
 });
-test('hourly overtime starts strictly after eight actual hours even without a break', () => {
-  for (const minutes of [450, 480, 481, 540]) {
-    const m = metrics('staff1', minutes, 0);
-    assert.equal(m.scheduledOutsideM, Math.max(0, minutes - 480));
-    assert.equal(m.statutoryOtM, Math.max(0, minutes - 480));
+test('hourly uses the same break-shortage adjustment as full time', () => {
+  for (const [minutes, breakM, expected] of [
+    [360, 0, 0], [450, 0, 15], [480, 0, 45],
+    [480, 45, 0], [481, 60, 1], [540, 30, 90], [540, 90, 60]
+  ]) {
+    const m = metrics('staff1', minutes, breakM);
+    const full = metrics('staff2', minutes, breakM);
+    assert.equal(m.legalBreakShortageM, full.legalBreakShortageM);
+    assert.equal(m.statutoryOtM, expected);
+    assert.equal(m.scheduledOutsideM, expected);
     assert.equal(m.scheduledOutsideM - m.statutoryOtM, 0);
   }
 });

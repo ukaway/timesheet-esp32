@@ -122,8 +122,8 @@ function calcAttendanceMetrics_(staffId, dateStr, intervals, workMin, breakMin) 
   const outsideWorkM = earlyBeforeScheduleM + afterScheduledSpanM + shortBreakM;
   const outsideWorkWithLegalBreakM = outsideWorkM + legalBreakShortageM;
   const overScheduledM = Math.max(0, adjustedWorkM - scheduledMin);
-  const overtimeWorkM = style.type === 'hourly' ? workMin : adjustedWorkM;
-  const statutoryOtM = Math.max(0, overtimeWorkM - ATTENDANCE_RULES.LEGAL_DAILY_LIMIT_MIN);
+  // 時給制も他の勤務形態と同じく、休憩不足分を加算して時間外を判定する。
+  const statutoryOtM = Math.max(0, adjustedWorkM - ATTENDANCE_RULES.LEGAL_DAILY_LIMIT_MIN);
   const scheduledOutsideM = style.type === 'hourly'
     ? statutoryOtM
     : scheduledMin > 0
