@@ -53,12 +53,10 @@ test('editable numeric durations, formulas, rest classification and missing cloc
     autoResizeColumns(start, count) { layout.resize = [start, count]; } };
   ctx.writePeriodSheet_(sheet, 'A', '2026-09-21', '2026-10-20', report.days, report.byStaff.a, report.scheduled);
   const data = writes.find(rows => rows.length === report.days.length);
-  assert.deepEqual(Array.from(writes[2], row => Array.from(row)), [
-    ['総労働時間', '=B4*24'],
-    ['総所定外労働（時間外を除く）', '=B5*24'],
-    ['総時間外労働', '=B6*24'],
-    ['総遅刻早退', '=B7*24']
+  assert.deepEqual(Array.from(writes[0].slice(0, 4), row => row[2]), [
+    '=B4*24', '=B5*24', '=B6*24', '=B7*24'
   ]);
+  assert.deepEqual(Array.from(writes[1][0]), ['時間（hh:mm）', '時間（h）']);
   assert.equal(layout.rows, 10);
   assert.equal(layout.columns, 0);
   assert.deepEqual(layout.resize, [1, 12]);
@@ -72,5 +70,5 @@ test('editable numeric durations, formulas, rest classification and missing cloc
   assert.equal(writes[0][2][1], '=SUM(I11:I40)');
   assert.equal(data[0][7], 30 / 1440);
   assert.equal(data[0][8], 10 / 1440);
-  assert.equal(writes[0][2][3], '=SUM(K11:K40)-SUM(L11:L40)');
+  assert.equal(writes[0][2][4], '=SUM(K11:K40)-SUM(L11:L40)');
 });

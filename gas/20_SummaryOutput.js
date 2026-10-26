@@ -247,24 +247,18 @@ function writePeriodSheet_(sheet, name, start, end, days, records, scheduled) {
   sheet.getRange('A1').setValue(name + ' 勤怠記録');
   sheet.getRange('A2').setValue(start.replace(/-/g, '/') + '〜' + end.replace(/-/g, '/') + '（両端含む）');
   const sum = col => '=SUM(' + col + first + ':' + col + last + ')';
-  sheet.getRange(4, 1, 5, 4).setValues([
-    ['総労働時間', sum('J'), '総出勤日数', sum('L')],
-    ['総所定外労働（時間外を除く）', sum('H') + '-SUM(I' + first + ':I' + last + ')', '所定日数（全員共通）', sum('K')],
-    ['総時間外労働', sum('I'), '休み（所定日の本人未出勤）', '=SUM(K' + first + ':K' + last + ')-SUM(L' + first + ':L' + last + ')'],
-    ['総遅刻早退', sum('G'), '全員休みの日数', '=' + days.length + '-SUM(K' + first + ':K' + last + ')'],
-    ['未退勤の時間は集計対象外', '', '要確認日数', '=COUNTIF(C' + first + ':C' + last + ',"要確認*")']
+  sheet.getRange(4, 1, 5, 5).setValues([
+    ['総労働時間', sum('J'), '=B4*24', '総出勤日数', sum('L')],
+    ['総所定外労働（時間外を除く）', sum('H') + '-SUM(I' + first + ':I' + last + ')', '=B5*24', '所定日数（全員共通）', sum('K')],
+    ['総時間外労働', sum('I'), '=B6*24', '休み（所定日の本人未出勤）', '=SUM(K' + first + ':K' + last + ')-SUM(L' + first + ':L' + last + ')'],
+    ['総遅刻早退', sum('G'), '=B7*24', '全員休みの日数', '=' + days.length + '-SUM(K' + first + ':K' + last + ')'],
+    ['未退勤の時間は集計対象外', '', '', '要確認日数', '=COUNTIF(C' + first + ':C' + last + ',"要確認*")']
   ]);
   sheet.getRange('B4:B7').setNumberFormat('[h]:mm');
-  sheet.getRange('D4:D8').setNumberFormat('0');
-  // Sheetsの時間は日単位なので、24倍して小数の時間に変換する。
-  sheet.getRange('E3:F3').setValues([['時間集計', '時間（h）']]).setFontWeight('bold');
-  sheet.getRange('E4:F7').setValues([
-    ['総労働時間', '=B4*24'],
-    ['総所定外労働（時間外を除く）', '=B5*24'],
-    ['総時間外労働', '=B6*24'],
-    ['総遅刻早退', '=B7*24']
-  ]);
-  sheet.getRange('F4:F7').setNumberFormat('0.00" h"');
+  sheet.getRange('E4:E8').setNumberFormat('0');
+  // Sheetsの時間は日単位なので、隣のC列に24倍した小数時間を併記する。
+  sheet.getRange('B3:C3').setValues([['時間（hh:mm）', '時間（h）']]).setFontWeight('bold');
+  sheet.getRange('C4:C7').setNumberFormat('0.00" h"');
   sheet.getRange(headerRow, 1, 1, header.length).setValues([header]).setFontWeight('bold').setBackground('#dce6f1');
   sheet.getRange(first, 1, data.length, header.length).setValues(data);
   sheet.getRange(first, 6, data.length, 5).setNumberFormat('[h]:mm');
