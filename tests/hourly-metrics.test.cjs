@@ -22,10 +22,10 @@ test('hourly ignores old scheduled segments and has no lateness', () => {
   assert.equal(m.lateEarlyM, 0);
   assert.equal(m.scheduledOutsideM, 0);
 });
-test('hourly uses the same break-shortage adjustment as full time', () => {
+test('all styles assess break shortage separately without double counting work', () => {
   for (const [minutes, breakM, expected] of [
-    [360, 0, 0], [450, 0, 15], [480, 0, 45],
-    [480, 45, 0], [481, 60, 1], [540, 30, 90], [540, 90, 60]
+    [360, 0, 0], [450, 0, 0], [480, 0, 0],
+    [480, 45, 0], [481, 60, 1], [540, 30, 60], [540, 90, 60]
   ]) {
     const m = metrics('staff1', minutes, breakM);
     const full = metrics('staff2', minutes, breakM);
@@ -35,9 +35,18 @@ test('hourly uses the same break-shortage adjustment as full time', () => {
     assert.equal(m.scheduledOutsideM - m.statutoryOtM, 0);
   }
 });
-test('full time retains schedule and existing break-shortage overtime calculation', () => {
+test('full time retains schedule but does not add missing breaks to actual work', () => {
   const m = metrics('staff2', 480, 0);
   assert.equal(m.scheduledM, 450);
   assert.equal(m.legalBreakShortageM, 45);
-  assert.equal(m.statutoryOtM, 45);
+  assert.equal(m.statutoryOtM, 0);
+  assert.equal(m.adjustedWorkM, 480);
+  assert.equal(m.scheduledOutsideM, 30);
+});
+
+test('statutory break boundaries include exactly eight hours in the 45-minute band', () => {
+  for (const [minutes, expected] of [
+    [359, 0], [360, 0], [360 + 1/60, 45],
+    [479, 45], [480, 45], [480 + 1/60, 60], [540, 60]
+  ]) assert.equal(ctx.requiredLegalBreakMin_(minutes), expected);
 });

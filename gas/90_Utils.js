@@ -112,7 +112,8 @@ function calcAttendanceMetrics_(staffId, dateStr, intervals, workMin, breakMin) 
   const overtimeBaseM = workMin;
   const requiredLegalBreakM = requiredLegalBreakMin_(overtimeBaseM);
   const legalBreakShortageM = Math.max(0, requiredLegalBreakM - (breakMin || 0));
-  const adjustedWorkM = overtimeBaseM + legalBreakShortageM;
+  // 打刻区間の合計は既に実働。休憩不足を再加算すると二重計上になる。
+  const adjustedWorkM = overtimeBaseM;
   const shortageMin = Math.max(0, scheduledMin - scheduledWorkMin);
   const lateEarlyM = style.type === 'full_time' &&
       scheduledMin > 0 &&
@@ -120,9 +121,9 @@ function calcAttendanceMetrics_(staffId, dateStr, intervals, workMin, breakMin) 
     ? shortageMin
     : 0;
   const outsideWorkM = earlyBeforeScheduleM + afterScheduledSpanM + shortBreakM;
-  const outsideWorkWithLegalBreakM = outsideWorkM + legalBreakShortageM;
+  const outsideWorkWithLegalBreakM = outsideWorkM;
   const overScheduledM = Math.max(0, adjustedWorkM - scheduledMin);
-  // 時給制も他の勤務形態と同じく、休憩不足分を加算して時間外を判定する。
+  // 全勤務形態で実働に基づく日8時間超を判定する。
   const statutoryOtM = Math.max(0, adjustedWorkM - ATTENDANCE_RULES.LEGAL_DAILY_LIMIT_MIN);
   const scheduledOutsideM = style.type === 'hourly'
     ? statutoryOtM

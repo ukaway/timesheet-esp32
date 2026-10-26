@@ -102,7 +102,7 @@ const DEFAULT_WORK_STYLES = {
   },
   hourly_part_time: {
     type: 'hourly',
-    schedule: {} // 所定時間なし。休憩不足調整後8時間超のみ時間外。
+    schedule: {} // 所定時間なし。実働8時間超のみ時間外。
   }
 };
 const WORK_STYLE_OVERRIDES = getJsonScriptProp_('KINTAI_WORK_STYLES_JSON', {});
