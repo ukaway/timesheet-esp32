@@ -140,7 +140,8 @@ function setupSummaryTrigger() {
 // ===== 任意期間の保存用ブック（既存サマリとは別に毎回新規作成） =====
 function onOpen() {
   SpreadsheetApp.getUi().createMenu('勤怠出力')
-    .addItem('期間を指定してブック保存', 'exportAttendanceBookPrompt')
+    .addItem('出力設定シートを作成・開く', 'setupAttendanceExportSettings')
+    .addItem('設定した期間でブック保存', 'exportAttendanceBookFromSettings')
     .addToUi();
 }
 
@@ -264,4 +265,56 @@ function writePeriodSheet_(sheet, name, start, end, days, records, scheduled) {
   sheet.autoResizeColumns(1, header.length);
   sheet.getRange('A1').setFontWeight('bold');
   sheet.getRange('K10:L10').setNote('所定日・出勤日は1、該当しない日は0。集計はこの列を参照します。');
+}
+
+
+/** 初回に実行。入力済みの期間は上書きしない。UIを使わずGASエディタから実行可能。 */
+function setupAttendanceExportSettings() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName('出力設定');
+  if (!sheet) {
+    sheet = ss.insertSheet('出力設定');
+    sheet.getRange('A1:B1').setValues([['勤怠ブック出力設定', '入力値']]).setFontWeight('bold');
+    sheet.getRange('A2:A3').setValues([['開始日'], ['終了日']]);
+    sheet.getRange('B2:B3').setNumberFormat('@');
+    sheet.getRange('B2').setNote('yyyy/mm/dd形式で入力。例: 2026/09/21');
+    sheet.getRange('B3').setNote('yyyy/mm/dd形式で入力。例: 2026/10/20（当日を含む）');
+    sheet.getRange('A5:B7').setValues([
+      ['使い方', 'B2に開始日、B3に終了日を入力してください。'],
+      ['実行関数', 'exportAttendanceBookFromSettings'],
+      ['保存先URL', '']
+    ]);
+    sheet.setColumnWidth(1, 180);
+    sheet.setColumnWidth(2, 480);
+    sheet.setFrozenRows(1);
+  }
+  ss.setActiveSheet(sheet);
+  console.log('出力設定シートのB2・B3に日付（yyyy/mm/dd）を入力してください。');
+}
+
+/** 出力設定のB2/B3を読み取り、保存したブックのURLをB7に記録する。 */
+function exportAttendanceBookFromSettings() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('出力設定');
+  if (!sheet) {
+    setupAttendanceExportSettings();
+    throw new Error('出力設定シートを作成しました。B2に開始日、B3に終了日を入力し、再実行してください。');
+  }
+  const values = sheet.getRange('B2:B3').getValues();
+  const tz = ss.getSpreadsheetTimeZone();
+  const start = exportSettingsDateText_(values[0][0], tz);
+  const end = exportSettingsDateText_(values[1][0], tz);
+  if (!start || !end) throw new Error('出力設定シートのB2・B3に日付（yyyy/mm/dd）を入力してください。');
+  const result = exportAttendanceBook(start, end);
+  sheet.getRange('B7').setValue(result.url);
+  console.log('保存完了: ' + result.url);
+  return result;
+}
+
+function exportSettingsDateText_(value, tz) {
+  // Sheetsが入力を日付型に変換した場合も、ブックのタイムゾーンで扱う。
+  if (Object.prototype.toString.call(value) === '[object Date]' && !isNaN(value.getTime())) {
+    return Utilities.formatDate(value, tz, 'yyyy/MM/dd');
+  }
+  return String(value == null ? '' : value).trim();
 }
