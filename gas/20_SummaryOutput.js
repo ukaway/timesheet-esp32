@@ -256,12 +256,21 @@ function writePeriodSheet_(sheet, name, start, end, days, records, scheduled) {
   ]);
   sheet.getRange('B4:B7').setNumberFormat('[h]:mm');
   sheet.getRange('D4:D8').setNumberFormat('0');
+  // Sheetsの時間は日単位なので、24倍して小数の時間に変換する。
+  sheet.getRange('E3:F3').setValues([['時間集計', '時間（h）']]).setFontWeight('bold');
+  sheet.getRange('E4:F7').setValues([
+    ['総労働時間', '=B4*24'],
+    ['総所定外労働（時間外を除く）', '=B5*24'],
+    ['総時間外労働', '=B6*24'],
+    ['総遅刻早退', '=B7*24']
+  ]);
+  sheet.getRange('F4:F7').setNumberFormat('0.00" h"');
   sheet.getRange(headerRow, 1, 1, header.length).setValues([header]).setFontWeight('bold').setBackground('#dce6f1');
   sheet.getRange(first, 1, data.length, header.length).setValues(data);
   sheet.getRange(first, 6, data.length, 5).setNumberFormat('[h]:mm');
   sheet.getRange(first, 11, data.length, 2).setNumberFormat('0');
   sheet.setFrozenRows(headerRow);
-  sheet.setFrozenColumns(3);
+  sheet.setFrozenColumns(0);
   sheet.autoResizeColumns(1, header.length);
   sheet.getRange('A1').setFontWeight('bold');
   sheet.getRange('K10:L10').setNote('所定日・出勤日は1、該当しない日は0。集計はこの列を参照します。');

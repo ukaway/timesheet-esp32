@@ -46,10 +46,22 @@ test('editable numeric durations, formulas, rest classification and missing cloc
   const writes = [];
   const range = { setValues(value) { writes.push(value); return this; } };
   for (const method of ['setValue', 'setFontWeight', 'setBackground', 'setNumberFormat', 'setNote']) range[method] = () => range;
+  const layout = {};
   const sheet = { getMaxRows: () => 1000, getRange: () => range,
-    setFrozenRows() {}, setFrozenColumns() {}, autoResizeColumns() {} };
+    setFrozenRows(n) { layout.rows = n; },
+    setFrozenColumns(n) { layout.columns = n; },
+    autoResizeColumns(start, count) { layout.resize = [start, count]; } };
   ctx.writePeriodSheet_(sheet, 'A', '2026-09-21', '2026-10-20', report.days, report.byStaff.a, report.scheduled);
-  const data = writes[2];
+  const data = writes.find(rows => rows.length === report.days.length);
+  assert.deepEqual(Array.from(writes[2], row => Array.from(row)), [
+    ['総労働時間', '=B4*24'],
+    ['総所定外労働（時間外を除く）', '=B5*24'],
+    ['総時間外労働', '=B6*24'],
+    ['総遅刻早退', '=B7*24']
+  ]);
+  assert.equal(layout.rows, 10);
+  assert.equal(layout.columns, 0);
+  assert.deepEqual(layout.resize, [1, 12]);
   assert.equal(data[0][9], 540 / 1440);
   assert.equal(data[1][2], '要確認（未退勤）');
   assert.equal(data[1][9], '');
