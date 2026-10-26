@@ -73,3 +73,12 @@ test('editable numeric durations, formulas, rest classification and missing cloc
   assert.equal(data[0][8], 10 / 1440);
   assert.equal(writes[0][2][4], '=SUM(K11:K40)-SUM(L11:L40)');
 });
+
+test('staff without records are omitted and automatically return with new attendance', () => {
+  const empty = ctx.buildPeriodReport_([raw[0]], '2026-09-21', '2026-10-20', 'Asia/Tokyo');
+  assert.deepEqual(Array.from(ctx.staffIdsWithRecords_(empty)), []);
+  const first = ctx.buildPeriodReport_(raw, '2026-09-21', '2026-09-21', 'Asia/Tokyo');
+  assert.deepEqual(Array.from(ctx.staffIdsWithRecords_(first)), ['a']);
+  const later = ctx.buildPeriodReport_(raw, '2026-09-21', '2026-10-20', 'Asia/Tokyo');
+  assert.deepEqual(Array.from(ctx.staffIdsWithRecords_(later)), ['a', 'b']);
+});

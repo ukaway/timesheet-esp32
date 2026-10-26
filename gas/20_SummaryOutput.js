@@ -52,30 +52,6 @@ function buildSummaryForStaff_(srcSheet, outSs, outSheetName, tz, staffId) {
   const dates = Object.keys(events).sort();
   const header = ['日付', '曜日', '勤務', '出勤', '退勤', '休憩', '遅早', '所定外労働', 'うち時間外', '実働'];
 
-  // 出力タブは毎回作り直す（結合残り・古いデータを完全排除）
-  const existing = outSs.getSheetByName(outSheetName);
-  if (existing) outSs.deleteSheet(existing);
-  const out = outSs.insertSheet(outSheetName);
-
-  [
-    80, // 日付
-    30, // 曜日
-    50, // 勤務
-    40, // 出勤
-    40, // 退勤
-    40, // 休憩
-    50, // 遅早
-    80, // 所定外労働
-    70, // うち時間外
-    40  // 実働
-  ].forEach((width, i) => {
-    out.setColumnWidth(i + 1, width);
-  });
-
-  out.getRange(1, 1, 1, header.length).setValues([header]).setFontWeight('bold');
-  out.setFrozenRows(1);
-  out.setFrozenColumns(3);
-
   const dataRows = [];
 
   dates.forEach(dateStr => {
@@ -117,7 +93,36 @@ function buildSummaryForStaff_(srcSheet, outSs, outSheetName, tz, staffId) {
     ]);
   });
 
-  if (dataRows.length === 0) return;
+  if (dataRows.length === 0) {
+    // 以前の自動サマリがあれば、過去データを表示し続けないよう空にする。
+    const previous = outSs.getSheetByName(outSheetName);
+    if (previous) previous.clearContents();
+    return;
+  }
+
+  // 出力タブは毎回作り直す（結合残り・古いデータを完全排除）
+  const existing = outSs.getSheetByName(outSheetName);
+  if (existing) outSs.deleteSheet(existing);
+  const out = outSs.insertSheet(outSheetName);
+
+  [
+    80, // 日付
+    30, // 曜日
+    50, // 勤務
+    40, // 出勤
+    40, // 退勤
+    40, // 休憩
+    50, // 遅早
+    80, // 所定外労働
+    70, // うち時間外
+    40  // 実働
+  ].forEach((width, i) => {
+    out.setColumnWidth(i + 1, width);
+  });
+
+  out.getRange(1, 1, 1, header.length).setValues([header]).setFontWeight('bold');
+  out.setFrozenRows(1);
+  out.setFrozenColumns(3);
 
   // A〜J列の値を一括書き込み
   out.getRange(2, 1, dataRows.length, 10).setValues(dataRows);
@@ -188,9 +193,11 @@ function exportAttendanceBook(startDate, endDate) {
   const log = src.getSheetByName(CONFIG.LOG_SHEET);
   if (!log) throw new Error('打刻ログがありません。');
   const report = buildPeriodReport_(log.getDataRange().getValues(), start, end, tz);
+  const activeIds = staffIdsWithRecords_(report);
+  if (!activeIds.length) throw new Error('指定期間に出勤記録がありません。');
   const book = SpreadsheetApp.create('勤怠_' + start + '〜' + end);
   book.setSpreadsheetTimeZone(tz);
-  ids.forEach((id, index) => {
+  activeIds.forEach((id, index) => {
     // IDを付けて同姓同名や使用不可文字によるタブ名の重複を避ける。
     const name = (STAFF[id].name + '_' + id).replace(/[\[\]:*?\/\\]/g, '_').slice(0, 90) + '_' + (index + 1);
     const sheet = index === 0 ? book.getSheets()[0].setName(name) : book.insertSheet(name);
@@ -324,4 +331,10 @@ function exportSettingsDateText_(value, tz) {
     return Utilities.formatDate(value, tz, 'yyyy/MM/dd');
   }
   return String(value == null ? '' : value).trim();
+}
+
+
+/** 期間内に出勤（未退勤も含む）がある職員のみ。IDの固定除外はしない。 */
+function staffIdsWithRecords_(report) {
+  return Object.keys(STAFF).filter(id => Object.keys(report.byStaff[id] || {}).length > 0);
 }
